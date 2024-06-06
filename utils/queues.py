@@ -32,10 +32,16 @@ class Battery:
     MAX_CYCLES = 3
 
     def __init__(self):
-        self.max_residual_time: int = ResidualTimeMax.BASE
+        self._max_residual_time: int = ResidualTimeMax.W65
         self.residual: int = 0
         self.status: BatteryStatus = BatteryStatus.FULL
         self.complete_cycles: int = 0
+
+    def init_battery(self, solar_panel=False):
+        if solar_panel:
+            self.residual = self._max_residual_time
+        else:
+            self.residual = ResidualTimeMax.BASE
 
 
 class MMmB:

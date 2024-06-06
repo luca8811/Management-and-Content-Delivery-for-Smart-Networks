@@ -10,7 +10,7 @@ A_nodes = np.array([1, 1, 2, 3, 5, 5, 3, 2, 3, 5, 5, 2, 1, 1]) / 5
 linear_interp = interp1d(t_nodes, A_nodes, kind='linear')
 
 # Interpolation on all the hours in a day
-t = np.linspace(0, 24, 25)  # 100 punti per visualizzare l'interpolazione
+t = np.linspace(0, 24, 25)
 arrivals_profile = linear_interp(t)
 
 if __name__ == "__main__":

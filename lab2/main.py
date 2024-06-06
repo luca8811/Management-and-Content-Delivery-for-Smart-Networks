@@ -4,6 +4,7 @@ from utils.queues import MMmB, Client, BatteryStatus, Battery
 from utils.measurements import Statistics, Measurements
 from enum import Enum
 import matplotlib.pyplot as plt
+import arrivals_profile
 
 
 class Event(Enum):
@@ -13,10 +14,10 @@ class Event(Enum):
     RECHARGE = 4
 
 
-SERVICE_RATE = 100
-ARRIVAL_RATE = 100
+SERVICE_RATE = 5
+ARRIVAL_RATE = 2
 SERVICE = 1 / SERVICE_RATE  # SERVICE is the average service time; service rate = 1/SERVICE
-ARRIVAL = 1 / ARRIVAL_RATE  # ARRIVAL is the average inter-arrival time; arrival rate = 1/ARRIVAL
+# ARRIVAL = 1 / ARRIVAL_RATE  # ARRIVAL is the average inter-arrival time; arrival rate = 1/ARRIVAL
 BUFFER_SIZE = 300  # Infinite buffer -> 0
 m_ANTENNAS = 2
 N_DRONES = 1
@@ -26,7 +27,8 @@ SERVICE_TIMES = [SERVICE for i in range(m_ANTENNAS)]
 TYPE1 = 1
 
 # time unit: seconds
-SIM_TIME = 43200  # 12 hours
+STARTING_TIME = 8 * 3600
+SIM_TIME = 12 * 3600  # 12 hours
 
 users = 0
 MMms = {i: MMmB(service_times=SERVICE_TIMES, buffer_size=BUFFER_SIZE) for i in range(N_DRONES)}
@@ -42,7 +44,7 @@ def send_drone(time, FES: PriorityQueue, queue_id, desired_time=0):
     # checking if battery is full, and managing the case of an eventual solar panel equipped
     if queue.battery.status == BatteryStatus.FULL:
         queue.battery.status = BatteryStatus.IN_USE
-        queue.battery.residual = queue.battery.max_residual_time
+        queue.battery.init_battery(8 * 3600 <= time <= 16 * 3600)
     if desired_time == 0:
         tot_time = queue.battery.residual
     else:
@@ -103,7 +105,8 @@ def evt_arrival(time, FES, queue_id):
                             delay=data.delay)
 
     # sample the time until the next event
-    inter_arrival = random.expovariate(lambd=1.0 / ARRIVAL)
+    # inter_arrival = random.expovariate(lambd=1.0 / ARRIVAL)
+    inter_arrival = random.expovariate(lambd=ARRIVAL_RATE * arrivals_profile.arrivals_profile[int(time / 3600)])
 
     # schedule the next arrival
     FES.put((time + inter_arrival, Event.ARRIVAL, resolve_MMm(), None))
@@ -163,7 +166,7 @@ def evt_departure(time, FES, queue_id, server_id):
 
 def plot_users(measurements: Measurements):
     plt.figure()
-    times, users_count = measurements.dispatch_users(starting_time)
+    times, users_count = measurements.dispatch_users(STARTING_TIME)
     plt.plot(times, users_count)
     plt.xlabel('time')
     plt.ylabel('number of users')
@@ -174,7 +177,7 @@ def plot_users(measurements: Measurements):
 
 def plot_arrivals(measurements: Measurements):
     plt.figure()
-    times, arrivals_count = measurements.dispatch_arrivals(starting_time)
+    times, arrivals_count = measurements.dispatch_arrivals(STARTING_TIME)
     plt.plot(times, arrivals_count)
     plt.xlabel('time (hours)')
     plt.ylabel('number of arrivals')
@@ -185,7 +188,7 @@ def plot_arrivals(measurements: Measurements):
 
 def plot_departures(measurements: Measurements):
     plt.figure()
-    times, departures_count = measurements.dispatch_departures(starting_time)
+    times, departures_count = measurements.dispatch_departures(STARTING_TIME)
     plt.plot(times, departures_count)
     plt.xlabel('time (hours)')
     plt.ylabel('number of departures')
@@ -196,7 +199,7 @@ def plot_departures(measurements: Measurements):
 
 def plot_losses(measurements: Measurements):
     plt.figure()
-    times, losses_count = measurements.dispatch_losses(starting_time)
+    times, losses_count = measurements.dispatch_losses(STARTING_TIME)
     plt.plot(times, losses_count)
     plt.xlabel('time (hours)')
     plt.ylabel('number of losses')
@@ -207,7 +210,7 @@ def plot_losses(measurements: Measurements):
 
 def plot_delay(measurements: Measurements):
     plt.figure()
-    times, delay_count = measurements.dispatch_delay(starting_time)
+    times, delay_count = measurements.dispatch_delay(STARTING_TIME)
     plt.plot(times, delay_count)
     plt.xlabel('time (hours)')
     plt.ylabel('delay (units)')
@@ -223,7 +226,6 @@ if __name__ == '__main__':
     measurements = Measurements()
 
     # the simulation time
-    starting_time = 8 * 3600
     time = 0
 
     # the list of events in the form: (time, type)
