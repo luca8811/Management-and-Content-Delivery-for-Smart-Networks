@@ -1,7 +1,7 @@
 import random
 from queue import PriorityQueue
 from utils.queues import MMmB, Client
-from utils.measurements import Measure
+from utils.measurements import Statistics
 
 SERVICE = 20.0  # SERVICE is the average service time; service rate = 1/SERVICE
 ARRIVAL = 3.0  # ARRIVAL is the average inter-arrival time; arrival rate = 1/ARRIVAL
@@ -96,7 +96,7 @@ def departure(time, FES, queue_id, server_id):
 if __name__ == '__main__':
     random.seed(42)
 
-    data = Measure(0, 0, 0, 0, 0, 0)
+    data = Statistics(0, 0, 0, 0, 0, 0)
 
     # the simulation time
     time = 0
