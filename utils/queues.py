@@ -1,4 +1,5 @@
 import random
+from enum import Enum
 
 
 class Client:
@@ -13,13 +14,47 @@ class Server:
         self.service_time = service_time  # service period specific for this server
 
 
+class ResidualTimeMax:
+    BASE = 25 * 60
+    W45 = 35 * 60
+    W65 = 40 * 60
+    W75 = 45 * 60
+
+
+class BatteryStatus(Enum):
+    EMPTY = 1
+    FULL = 2
+    IN_USE = 3
+
+
+class Battery:
+    RECHARGE_TIME = 3600
+    MAX_CYCLES = 3
+
+    def __init__(self):
+        self._max_residual_time: int = ResidualTimeMax.W65
+        self.residual: int = 0
+        self.status: BatteryStatus = BatteryStatus.FULL
+        self.complete_cycles: int = 0
+
+    def init_battery(self, solar_panel=False):
+        if solar_panel:
+            self.residual = self._max_residual_time
+        else:
+            self.residual = ResidualTimeMax.BASE
+
+
 class MMmB:
     def __init__(self, service_times: list[float], buffer_size=0):
         self.buffer_size = buffer_size  # B
+        self.battery: Battery = Battery()
         self._queue: list[Client] = []
         self._servers: dict[int, Server] = {i: Server(service_times[i]) for i in range(len(service_times))}
         self._rr_scheduling: list[int] = list(self._servers.keys())
         self._scheduling_policy = self._get_server_fastest
+
+    def queue_clear(self):
+        self._queue.clear()
 
     def insert(self, event: Client):
         assert not self.is_queue_full()
