@@ -1,7 +1,7 @@
 import random
 from queue import PriorityQueue
-from utils.queues import MMmB, Client
-from utils.measurements import Measure
+from queues import MMmB, Client
+from measurements import Measure
 
 SERVICE = 20.0  # SERVICE is the average service time; service rate = 1/SERVICE
 ARRIVAL = 3.0  # ARRIVAL is the average inter-arrival time; arrival rate = 1/ARRIVAL
