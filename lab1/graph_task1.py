@@ -3,9 +3,6 @@ import pandas as pd
 # Load the data from CSV file
 data = pd.read_csv('/Users/lucabernardi/PycharmProjects/Management/lab1/simulation_results.csv')
 
-import seaborn as sns
-import matplotlib.pyplot as plt
-
 # Define the metrics to plot
 import seaborn as sns
 import matplotlib.pyplot as plt

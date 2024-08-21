@@ -1,27 +1,34 @@
 class Statistics:
-    def __init__(self, Narr, Ndep, Nlos, NAverageUser, OldTimeEvent, AverageDelay):
-        self.arr = Narr
-        self.dep = Ndep
-        self.los = Nlos
-        self.ut = NAverageUser
-        self.oldT = OldTimeEvent
-        self.delay = AverageDelay
+    def __init__(self):
+        self.arr = 0
+        self.dep = 0
+        self.los = 0
+        self.users = 0
+        self.drones = 0
+        self.charging_drones = 0
+        self.ut = 0
+        self.oldT = 0
+        self.delay = 0
 
 
 class Measurements:
     def __init__(self):
         self.users = []
+        self.drones = []
+        self.charging_drones = []
         self.arrivals = []
         self.departures = []
         self.losses = []
         self.delay = []
 
-    def add_record(self, time, users, arrivals, departures, losses, delay):
-        self.users.append((time, users))
-        self.arrivals.append((time, arrivals))
-        self.departures.append((time, departures))
-        self.losses.append((time, losses))
-        self.delay.append((time, delay))
+    def add_record(self, time, data: Statistics):
+        self.users.append((time, data.users))
+        self.drones.append((time, data.drones))
+        self.charging_drones.append((time, data.charging_drones))
+        self.arrivals.append((time, data.arr))
+        self.departures.append((time, data.dep))
+        self.losses.append((time, data.los))
+        self.delay.append((time, data.delay))
 
     def dispatch_users(self, starting_time):
         times = []
@@ -30,6 +37,22 @@ class Measurements:
             times.append((time + starting_time) / 3600)
             users_t.append(users)
         return times, users_t
+
+    def dispatch_drones(self, starting_time):
+        times = []
+        drones_t = []
+        for time, drones in self.drones:
+            times.append((time + starting_time) / 3600)
+            drones_t.append(drones)
+        return times, drones_t
+
+    def dispatch_charging_drones(self, starting_time):
+        times = []
+        charging_drones_t = []
+        for time, charging_drones in self.charging_drones:
+            times.append((time + starting_time) / 3600)
+            charging_drones_t.append(charging_drones)
+        return times, charging_drones_t
 
     def dispatch_arrivals(self, starting_time):
         times = []

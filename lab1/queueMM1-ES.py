@@ -1,6 +1,6 @@
 import random
 from queue import PriorityQueue
-from utils.queues import MMmB, Client
+from utils.queues import MMmB, Packet
 from utils.measurements import Statistics
 
 SERVICE = 20.0  # SERVICE is the average service time; service rate = 1/SERVICE
@@ -36,9 +36,9 @@ def arrival(time, FES, queue: MMmB):
     else:
         users += 1
         # create a record for the client
-        client = Client(TYPE1, time)
+        packet = Packet(arrival_time=time)
         # insert the record in the queue
-        queue.insert(client)
+        queue.insert(packet)
 
     # sample the time until the next event
     inter_arrival = random.expovariate(lambd=1.0 / ARRIVAL)
