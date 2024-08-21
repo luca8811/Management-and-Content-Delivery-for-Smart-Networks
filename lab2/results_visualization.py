@@ -48,6 +48,34 @@ def plot_losses(measurements: Measurements):
     plt.show()
 
 
+def plot_dep_los(measurements: Measurements):
+    plt.figure()
+    times, departures_count = measurements.dispatch_departures(STARTING_TIME)
+    plt.plot(times, departures_count)
+    times, losses_count = measurements.dispatch_losses(STARTING_TIME)
+    plt.plot(times, losses_count)
+    plt.legend(["departures", "losses"])
+    plt.xlabel('time (hours)')
+    plt.ylabel('amount of packets')
+    plt.grid()
+    plt.title('Departures and losses over time')
+    plt.show()
+
+
+def plot_drones(measurements: Measurements):
+    plt.figure()
+    times, drones_count = measurements.dispatch_drones(STARTING_TIME)
+    plt.plot(times, drones_count)
+    times, charging_drones_count = measurements.dispatch_charging_drones(STARTING_TIME)
+    plt.plot(times, charging_drones_count)
+    plt.legend(['Drones', 'Charging drones'])
+    plt.xlabel('time (hours)')
+    plt.ylabel('drones (units)')
+    plt.grid()
+    plt.title('Number of drones over time')
+    plt.show()
+
+
 def plot_delay(measurements: Measurements):
     plt.figure()
     times, delay_count = measurements.dispatch_delay(STARTING_TIME)

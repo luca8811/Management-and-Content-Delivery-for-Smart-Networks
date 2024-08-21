@@ -2,9 +2,8 @@ import random
 from enum import Enum
 
 
-class Client:
-    def __init__(self, type, arrival_time):
-        self.type = type
+class Packet:
+    def __init__(self, arrival_time):
         self.arrival_time = arrival_time
 
 
@@ -14,25 +13,27 @@ class Server:
         self.service_time = service_time  # service period specific for this server
 
 
-class ResidualTimeMax:
-    BASE = 25 * 60
-    W45 = 35 * 60
-    W65 = 40 * 60
-    W75 = 45 * 60
+residual_time_max = {
+    "BAT": 25 * 60,
+    "W45": 35 * 60,
+    "W65": 40 * 60,
+    "W75": 45 * 60
+}
 
 
 class BatteryStatus(Enum):
     EMPTY = 1
     FULL = 2
     IN_USE = 3
+    PAUSED = 4
 
 
 class Battery:
     RECHARGE_TIME = 3600
     MAX_CYCLES = 3
 
-    def __init__(self):
-        self._max_residual_time: int = ResidualTimeMax.W65
+    def __init__(self, power_supply: str):
+        self._max_residual_time: int = residual_time_max[power_supply]
         self.residual: int = 0
         self.status: BatteryStatus = BatteryStatus.FULL
         self.complete_cycles: int = 0
@@ -41,15 +42,14 @@ class Battery:
         if solar_panel:
             self.residual = self._max_residual_time
         else:
-            self.residual = ResidualTimeMax.BASE
+            self.residual = residual_time_max["BAT"]
 
 
 class MMmB:
-    def __init__(self, type, service_times: list[float], buffer_size=0):
-        self.type = type
+    def __init__(self, power_supply: str, service_times: list[float], buffer_size=0):
         self.buffer_size = buffer_size  # B
-        self.battery: Battery = Battery()
-        self._queue: list[Client] = []
+        self.battery: Battery = Battery(power_supply)
+        self._queue: list[Packet] = []
         self._servers: dict[int, Server] = {i: Server(service_times[i]) for i in range(len(service_times))}
         self._rr_scheduling: list[int] = list(self._servers.keys())
         self._scheduling_policy = self._get_server_fastest
@@ -57,9 +57,9 @@ class MMmB:
     def queue_clear(self):
         self._queue.clear()
 
-    def insert(self, event: Client):
+    def insert(self, packet: Packet):
         assert not self.is_queue_full()
-        self._queue.append(event)
+        self._queue.append(packet)
 
     def queue_size(self):
         return len(self._queue)
@@ -90,6 +90,9 @@ class MMmB:
             s_id = self._rr_scheduling.pop(0)
         self._rr_scheduling.append(s_id)
         return s_id
+
+    def avg_service_time(self):
+        return sum(map(lambda server: server.service_time, self._servers.values())) / len(self._servers)
 
     def engage_server(self):
         assert self._get_servers_working() < len(self._servers)

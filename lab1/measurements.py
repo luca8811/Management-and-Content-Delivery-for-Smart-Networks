@@ -1,6 +1,3 @@
-from scipy.stats import t
-import numpy as np
-import scipy
 class Measure:
     def __init__(self):
         self.arr = 0  # Number of arrivals
@@ -19,7 +16,6 @@ class Measure:
         self.queue_delays = []  # List of individual queue delays for distribution
         self.waiting_delays = []  # List of individual waiting delays for distribution
         self.time_series = []  # Time series data for further analysis
-
 
 # Example usage:
 # data_points = [1, 2, 3, 4, 5]  # This should be replaced with actual data from simulations

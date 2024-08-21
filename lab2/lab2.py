@@ -1,18 +1,29 @@
 import json
 import random
 from queue import PriorityQueue
-from utils.queues import MMmB, Client, BatteryStatus, Battery
+from utils.queues import BatteryStatus, Battery, Packet
 from utils.measurements import Statistics, Measurements
 from enum import Enum
 import arrivals_profile
-import results_visualization
 
 # LEGEND:
 #   - FES: Finite Event Schedule
 
-task = "TASK1"
-with open('variables.json') as f:
-    variables = json.load(f)[task]
+variables = {}
+MMms = {}
+data = Statistics()
+measurements = Measurements()
+
+
+def init_variables(task):
+    """
+    Initializes the environment of the running case, loading the configuration
+    file "variables.json". These variables are largely used inside the program,
+    so it is useful to make them change depending on the threatened task
+    """
+    global variables
+    with open('variables.json') as f:
+        variables = json.load(f)[task]
 
 
 class Event(Enum):
@@ -22,195 +33,183 @@ class Event(Enum):
     RECHARGE = 4
 
 
-users = 0
-MMms = {}
-for i, drone in enumerate(variables['drones']):
-    # TODO: service times, no list
-    MMms[i] = MMmB(type=drone['TYPE'],
-                   service_times=[1 / drone['SERVICE_RATE'] for m in range(drone['m_ANTENNAS'])],
-                   buffer_size=variables['BUFFER_SIZE'])
+def assign_packet_to_drone():
+    """
+    When a packet arrives, we want it to be assigned to a running drone.
+    It returns the id of the fastest (average service time of its servers)
+    drone, if any available (running and with space inside its queue).
+    """
+
+    def is_available(drone: tuple[int, MMms]):
+        return drone[1].battery.status == BatteryStatus.IN_USE and not drone[1].is_queue_full()
+
+    drones = list(filter(is_available, MMms.items()))
+    if len(drones) > 0:
+        drones = sorted(drones, key=lambda drone: drone[1].avg_service_time())
+        return drones[0][0]
+    return None
 
 
-def resolve_MMm():
-    return random.choice(list(MMms.keys()))
-
-
-# This function schedules the battery consumption of a drone. If 'tot_time' is set to 0, the maximum will be set
 def send_drone(time, FES: PriorityQueue, drone_id, desired_time=0):
-    queue = MMms[drone_id]
+    """
+    Activates a drone, and schedules its battery consumption.
+    If 'tot_time' is set to 0, the maximum will be set
+    """
+    drone = MMms[drone_id]
     # checking if battery is full, and managing the case of an eventual solar panel equipped
-    if queue.battery.status == BatteryStatus.FULL:
-        queue.battery.status = BatteryStatus.IN_USE
-        queue.battery.init_battery(8 * 3600 <= time <= 16 * 3600)
+    if drone.battery.status == BatteryStatus.FULL:
+        drone.battery.status = BatteryStatus.IN_USE
+        drone.battery.init_battery(8 * 3600 <= time <= 16 * 3600)
     if desired_time == 0:
-        tot_time = queue.battery.residual
+        tot_time = drone.battery.residual
     else:
-        tot_time = min(desired_time, queue.battery.residual)
+        tot_time = min(desired_time, drone.battery.residual)
     FES.put((time + tot_time, Event.SWITCH_OFF, drone_id, tot_time))
+    data.drones += 1
+    add_data_record(time)
+
+
+def request_drone(time):
+    """
+    Used after a loss, to "call" another drone to manage the load.
+    It returns the id of the fastest (average service time of its servers)
+    drone, if any available (battery not empty).
+    """
+
+    def is_available(drone: tuple[int, MMms]):
+        return drone[1].battery.status in [BatteryStatus.PAUSED, BatteryStatus.FULL]
+
+    drones = list(filter(is_available, MMms.items()))
+    if len(drones) > 0:
+        drones = sorted(drones, key=lambda drone: drone[1].avg_service_time(), reverse=True)
+        i_max = len(drones) - 1
+        req = int(i_max * arrivals_profile.arrivals_profile[int(time / 3600)])
+        return drones[req][0]
+    return None
 
 
 def schedule_recharge(time, FES: PriorityQueue, drone_id):
+    """
+    Used to schedule the fully charged battery of a drone, after it has
+    been emptied.
+    """
     FES.put((time + Battery.RECHARGE_TIME, Event.RECHARGE, drone_id, None))
+    data.charging_drones += 1
+    add_data_record(time)
 
 
 def evt_switch_off(time, FES: PriorityQueue, drone_id, tot_time):
-    queue = MMms[drone_id]
-    queue.battery.residual -= tot_time
-    if queue.battery.residual == 0:
-        queue.battery.status = BatteryStatus.EMPTY
-        queue.queue_clear()
+    """
+    Called when a drone has to be switched off. All its queue is lost, even
+    if there's still energy in its battery.
+    """
+    drone = MMms[drone_id]
+    drone.battery.residual -= tot_time
+    if drone.battery.residual == 0:
+        drone.battery.status = BatteryStatus.EMPTY
+        drone.queue_clear()
         schedule_recharge(time, FES, drone_id)
+    else:
+        drone.battery.status = BatteryStatus.PAUSED
+        drone.queue_clear()
+    data.drones -= 1
+    add_data_record(time)
 
 
-def evt_recharge(time, FES: PriorityQueue, drone_id):
+def evt_recharge(time, drone_id):
+    """
+    Called when the battery of a drone has been fully charged.
+    """
     queue = MMms[drone_id]
     queue.battery.complete_cycles += 1
     queue.battery.status = BatteryStatus.FULL
-    # TODO: send again? for how much time
-    send_drone(time, FES, drone_id)
+    data.charging_drones -= 1
+    add_data_record(time)
 
 
-def evt_arrival(time, FES, drone_id):
-    global users
-
-    # print("Arrival no. ",data.arr+1," at time ",time," with ",users," users" )
-
-    # drone scheduled to process service
-    drone = MMms[drone_id]
-
+def evt_arrival(time, FES: PriorityQueue):
+    """
+    Called when there's an arrival packet.
+    """
     # loss management - boolean result
-    loss = drone.is_queue_full() or drone.battery.status != BatteryStatus.IN_USE
+    drone_id = assign_packet_to_drone()
+    loss = drone_id is None
     if loss:
+        req_drone_id = request_drone(time)
+        if req_drone_id is not None:
+            send_drone(time, FES, req_drone_id)
         data.los += 1
     else:
-        users += 1
+        data.users += 1
         # create a record for the client
-        client = Client(drone.type, time)
+        client = Packet(arrival_time=time)
         # insert the record in the queue
-        drone.insert(client)
+        drone = MMms[drone_id]
+        drone.insert(packet=client)
 
-    # cumulate statistics
-    data.arr += 1
-    data.ut += users * (time - data.oldT)  # average users per time unit
-    data.oldT = time
-    # measurements
-    measurements.add_record(time=time,
-                            users=users,
-                            arrivals=data.arr,
-                            departures=data.dep,
-                            losses=data.los,
-                            delay=data.delay)
-
-    # sample the time until the next event
-    # inter_arrival = random.expovariate(lambd=1.0 / ARRIVAL)
-    inter_arrival = random.expovariate(
-        lambd=variables['ARRIVAL_RATE'] * arrivals_profile.arrivals_profile[int(time / 3600)])
-
-    # schedule the next arrival
-    FES.put((time + inter_arrival, Event.ARRIVAL, resolve_MMm(), None))
-
-    # if the server is idle start the service
-    if drone.can_engage_server():
-        (s_id, s_service_time) = drone.engage_server()
-        # sample the service time
-        service_time = random.expovariate(1.0 / s_service_time)
-        # service_time = 1 + random.uniform(0, SERVICE_TIME)
-
-        # schedule when the client will finish the service
-        FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
-
-
-def evt_departure(time, FES, drone_id, server_id):
-    global users
-
-    # print("Departure no. ",data.dep+1," at time ",time," with ",users," users" )
-
-    # drone scheduled
-    queue = MMms[drone_id]
-
-    # losses management
-    loss = queue.battery.status != BatteryStatus.IN_USE
-    if loss:
-        data.los += 1
-    else:
-        data.dep += 1
-        # get the first element from the queue
-        client = queue.consume(server_id)
-
-        # do whatever we need to do when clients go away
-
-        data.delay += (time - client.arrival_time)
-        users -= 1
-
-        # see whether there are more clients to in the line
-        if queue.can_engage_server():
-            (s_id, s_service_time) = queue.engage_server()
+        # if the server is idle start the service
+        if drone.can_engage_server():
+            (s_id, s_service_time) = drone.engage_server()
             # sample the service time
             service_time = random.expovariate(1.0 / s_service_time)
 
             # schedule when the client will finish the service
             FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
+
+    # sample the time until the next event
+    current_arrival_percentage = arrivals_profile.arrivals_profile[int(time / 3600)]
+    inter_arrival = random.expovariate(lambd=variables['ARRIVAL_RATE'] * current_arrival_percentage)
+
+    # schedule the next arrival
+    FES.put((time + inter_arrival, Event.ARRIVAL, None, None))
+
     # cumulate statistics
-    data.ut += users * (time - data.oldT)
+    data.arr += 1
+    data.ut += data.users * (time - data.oldT)  # average users per time unit
     data.oldT = time
     # measurements
-    measurements.add_record(time=time,
-                            users=users,
-                            arrivals=data.arr,
-                            departures=data.dep,
-                            losses=data.los,
-                            delay=data.delay)
+    add_data_record(time)
 
 
-if __name__ == '__main__':
-    random.seed(42)
+def evt_departure(time, FES, drone_id, server_id):
+    """
+    Called when a packet has been processed by a server of a drone.
+    """
+    # drone scheduled
+    drone = MMms[drone_id]
 
-    data = Statistics(0, 0, 0, 0, 0, 0)
-    measurements = Measurements()
+    # losses management
+    loss = drone.battery.status != BatteryStatus.IN_USE
+    if loss:
+        data.los += 1
+    else:
+        data.dep += 1
+        # get the first element from the queue
+        client = drone.consume(server_id)
 
-    # the simulation time
-    time = 0
+        # do whatever we need to do when clients go away
 
-    # the list of events in the form: (time, evt_type, drone_id, ???)
-    FES = PriorityQueue()
+        data.delay += (time - client.arrival_time)
+        data.users -= 1
 
-    # just to initialize the drones parameters
-    for drone_id in range(len(MMms)):
-        send_drone(time, FES, drone_id)
-    # schedule the first arrival at t=0. resolve_MMm is used to assign
-    # a drone which will process the first arrival
-    FES.put((0, Event.ARRIVAL, resolve_MMm(), None))
+        # see whether there are more clients to in the line
+        if drone.can_engage_server():
+            (s_id, s_service_time) = drone.engage_server()
+            # sample the service time
+            service_time = random.expovariate(1.0 / s_service_time)
 
-    # simulate until the simulated time reaches a constant
-    while time < variables['SIM_TIME']:
-        (time, event_type, drone_id, arg) = FES.get()
+            # schedule when the client will finish the service
+            FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
 
-        if event_type == Event.ARRIVAL:
-            evt_arrival(time, FES, drone_id)
-        elif event_type == Event.DEPARTURE:
-            evt_departure(time, FES, drone_id, arg)
-        elif event_type == Event.SWITCH_OFF:
-            evt_switch_off(time, FES, drone_id, arg)
-        elif event_type == Event.RECHARGE:
-            evt_recharge(time, FES, drone_id)
-    results_visualization.STARTING_TIME = variables['STARTING_TIME']
-    results_visualization.plot_users(measurements)
-    results_visualization.plot_arrivals(measurements)
-    results_visualization.plot_departures(measurements)
-    results_visualization.plot_losses(measurements)
-    results_visualization.plot_delay(measurements)
+    # cumulate statistics
+    data.ut += data.users * (time - data.oldT)
+    data.oldT = time
+    # measurements
+    add_data_record(time)
 
-    # print output data
-    print("MEASUREMENTS \n\nNo. of users in the queue:", users, "\nNo. of arrivals =",
-          data.arr, "- No. of departures =", data.dep)
 
-    print("\nArrival rate: ", data.arr / time, " - Departure rate: ", data.dep / time)
-    print("Loss rate: ", data.los / time, " - Packets loss: ", data.los)
-
-    print("\nAverage number of users: ", data.ut / time)
-
-    print("Average delay: ", data.delay / data.dep)
-    # print("Actual queue size: ", MMm.queue_size())
-
-    # if MMm.queue_size() > 0:
-    #     print("Arrival time of the last element in the queue:", MMm.get_last().arrival_time)
+def add_data_record(time):
+    """
+    Used to collect data to be plotted
+    """
+    measurements.add_record(time=time, data=data)

@@ -1,18 +1,32 @@
 {
-  "TASK1": {
+  "TASK4": {
+    "BASE_SERVICE_RATE": 5,
+    "BASE_BUFFER_SIZE": 100,
     "ARRIVAL_RATE": 2,
-    "BUFFER_SIZE": 300,
-    "drones": [
-      {
-        "m_ANTENNAS": 2,
-        "SERVICE_RATE": 5,
-        "TYPE": "A"
+    "drone_types": {
+      "A": {
+        "POW": "BAT",
+        "m_ANTENNAS": 1,
+        "SERVICE_RATE": 2,
+        "BUFFER_SIZE": 1
       },
-      {
+      "B": {
+        "POW": "W45",
         "m_ANTENNAS": 2,
-        "SERVICE_RATE": 5,
-        "TYPE": "A"
+        "SERVICE_RATE": 1,
+        "BUFFER_SIZE": 1
+      },
+      "C": {
+        "POW": "W65",
+        "m_ANTENNAS": 1,
+        "SERVICE_RATE": 1,
+        "BUFFER_SIZE": 2
       }
+    },
+    "drones": [
+      "A",
+      "B",
+      "C"
     ],
     "STARTING_TIME": 28800,
     "SIM_TIME": 43200
