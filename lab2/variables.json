@@ -1,0 +1,20 @@
+{
+  "TASK1": {
+    "ARRIVAL_RATE": 2,
+    "BUFFER_SIZE": 300,
+    "drones": [
+      {
+        "m_ANTENNAS": 2,
+        "SERVICE_RATE": 5,
+        "TYPE": "A"
+      },
+      {
+        "m_ANTENNAS": 2,
+        "SERVICE_RATE": 5,
+        "TYPE": "A"
+      }
+    ],
+    "STARTING_TIME": 28800,
+    "SIM_TIME": 43200
+  }
+}

@@ -45,7 +45,8 @@ class Battery:
 
 
 class MMmB:
-    def __init__(self, service_times: list[float], buffer_size=0):
+    def __init__(self, type, service_times: list[float], buffer_size=0):
+        self.type = type
         self.buffer_size = buffer_size  # B
         self.battery: Battery = Battery()
         self._queue: list[Client] = []
