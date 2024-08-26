@@ -36,8 +36,8 @@ class Event(Enum):
 def assign_packet_to_drone():
     """
     When a packet arrives, we want it to be assigned to a running drone.
-    It returns the id of the fastest (average service time of its servers)
-    drone, if any available (running and with space inside its queue).
+    It returns the id of the fastest (highest capacity) drone, if any
+    available (running and with space inside its queue).
     """
 
     def is_available(drone: tuple[int, MMms]):
@@ -45,7 +45,7 @@ def assign_packet_to_drone():
 
     drones = list(filter(is_available, MMms.items()))
     if len(drones) > 0:
-        drones = sorted(drones, key=lambda drone: drone[1].avg_service_time())
+        drones = sorted(drones, key=lambda drone: drone[1].get_capacity(), reverse=True)
         return drones[0][0]
     return None
 
@@ -58,8 +58,7 @@ def send_drone(time, FES: PriorityQueue, drone_id, desired_time=0):
     drone = MMms[drone_id]
     # checking if battery is full, and managing the case of an eventual solar panel equipped
     if drone.battery.status == BatteryStatus.FULL:
-        drone.battery.status = BatteryStatus.IN_USE
-        drone.battery.init_battery(8 * 3600 <= time <= 16 * 3600)
+        drone.switch_on(solar_panel=8 * 3600 <= time <= 16 * 3600)
     if desired_time == 0:
         tot_time = drone.battery.residual
     else:
@@ -81,7 +80,7 @@ def request_drone(time):
 
     drones = list(filter(is_available, MMms.items()))
     if len(drones) > 0:
-        drones = sorted(drones, key=lambda drone: drone[1].avg_service_time(), reverse=True)
+        drones = sorted(drones, key=lambda drone: drone[1].get_capacity(), reverse=True)
         i_max = len(drones) - 1
         req = int(i_max * arrivals_profile.arrivals_profile[int(time / 3600)])
         return drones[req][0]
@@ -96,6 +95,9 @@ def schedule_recharge(time, FES: PriorityQueue, drone_id):
     FES.put((time + Battery.RECHARGE_TIME, Event.RECHARGE, drone_id, None))
     data.charging_drones += 1
     add_data_record(time)
+    req_drone = request_drone(time)
+    if req_drone is not None:
+        send_drone(time, FES, req_drone)
 
 
 def evt_switch_off(time, FES: PriorityQueue, drone_id, tot_time):
@@ -104,14 +106,12 @@ def evt_switch_off(time, FES: PriorityQueue, drone_id, tot_time):
     if there's still energy in its battery.
     """
     drone = MMms[drone_id]
-    drone.battery.residual -= tot_time
+    drone.battery_consume(usage_time=tot_time)
     if drone.battery.residual == 0:
-        drone.battery.status = BatteryStatus.EMPTY
-        drone.queue_clear()
+        drone.switch_off(empty_battery=True)
         schedule_recharge(time, FES, drone_id)
     else:
-        drone.battery.status = BatteryStatus.PAUSED
-        drone.queue_clear()
+        drone.switch_off(empty_battery=False)
     data.drones -= 1
     add_data_record(time)
 
@@ -120,9 +120,8 @@ def evt_recharge(time, drone_id):
     """
     Called when the battery of a drone has been fully charged.
     """
-    queue = MMms[drone_id]
-    queue.battery.complete_cycles += 1
-    queue.battery.status = BatteryStatus.FULL
+    drone = MMms[drone_id]
+    drone.battery_recharge()
     data.charging_drones -= 1
     add_data_record(time)
 
