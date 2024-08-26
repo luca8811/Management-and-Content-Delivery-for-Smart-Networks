@@ -54,8 +54,22 @@ class MMmB:
         self._rr_scheduling: list[int] = list(self._servers.keys())
         self._scheduling_policy = self._get_server_fastest
 
-    def queue_clear(self):
+    def battery_recharge(self):
+        self.battery.status = BatteryStatus.FULL
+        self.battery.complete_cycles += 1
+
+    def battery_consume(self, usage_time):
+        self.battery.residual -= usage_time
+
+    def switch_on(self, solar_panel=False):
+        self.battery.status = BatteryStatus.IN_USE
+        self.battery.init_battery(solar_panel=solar_panel)
+
+    def switch_off(self, empty_battery=True):
+        for server in self._servers.values():
+            server.idle = True
         self._queue.clear()
+        self.battery.status = BatteryStatus.EMPTY if empty_battery else BatteryStatus.PAUSED
 
     def insert(self, packet: Packet):
         assert not self.is_queue_full()
@@ -91,8 +105,8 @@ class MMmB:
         self._rr_scheduling.append(s_id)
         return s_id
 
-    def avg_service_time(self):
-        return sum(map(lambda server: server.service_time, self._servers.values())) / len(self._servers)
+    def get_capacity(self):
+        return sum(map(lambda server: server.service_time, self._servers.values()))
 
     def engage_server(self):
         assert self._get_servers_working() < len(self._servers)

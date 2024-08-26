@@ -23,11 +23,20 @@
         "BUFFER_SIZE": 2
       }
     },
-    "drones": [
-      "A",
-      "B",
-      "C"
-    ],
+    "configurations": {
+      "I": [
+        "A",
+        "C"
+      ],
+      "II": [
+        "B",
+        "B"
+      ],
+      "III": [
+        "B",
+        "C"
+      ]
+    },
     "STARTING_TIME": 28800,
     "SIM_TIME": 43200
   }

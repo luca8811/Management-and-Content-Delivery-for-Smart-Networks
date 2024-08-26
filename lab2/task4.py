@@ -12,7 +12,7 @@ measurements = lab2.measurements
 data = lab2.data
 
 drone_types = variables['drone_types']
-for i, drone_type in enumerate(variables['drones']):
+for i, drone_type in enumerate(variables['configurations']['III']):
     drone = drone_types[drone_type]
     MMms[i] = MMmB(power_supply=drone['POW'],
                    service_times=[1 / (variables['BASE_SERVICE_RATE'] * drone['SERVICE_RATE'])
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     # results_visualization.plot_users(measurements)
     # results_visualization.plot_arrivals(measurements)
     results_visualization.plot_dep_los(measurements)
-    results_visualization.plot_drones(measurements)
+    # results_visualization.plot_drones(measurements)
     # results_visualization.plot_delay(measurements)
 
     # print output data
