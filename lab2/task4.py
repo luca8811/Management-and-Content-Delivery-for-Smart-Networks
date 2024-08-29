@@ -1,9 +1,10 @@
-from utils.queues import MMmB
-import lab2
-from lab2 import Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off
 import random
 from queue import PriorityQueue
+
+import lab2
 import results_visualization
+from lab2 import Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off
+from utils.queues import MMmB
 
 lab2.init_variables("TASK4")
 variables = lab2.variables
@@ -47,18 +48,20 @@ if __name__ == '__main__':
     results_visualization.STARTING_TIME = variables['STARTING_TIME']
     # results_visualization.plot_users(measurements)
     # results_visualization.plot_arrivals(measurements)
+    # results_visualization.plot_departures(measurements)
+    # results_visualization.plot_losses(measurements)
     results_visualization.plot_dep_los(measurements)
     # results_visualization.plot_drones(measurements)
     # results_visualization.plot_delay(measurements)
 
     # print output data
     print("MEASUREMENTS \n\nNo. of users in the queue:", data.users, "\nNo. of arrivals =",
-          data.arr, "- No. of departures =", data.dep)
+          data.arrivals, "- No. of departures =", data.departures)
 
-    print("\nArrival rate: ", data.arr / time, " - Departure rate: ", data.dep / time)
-    print("Loss rate: ", data.los / time, " - Packets loss: ", data.los)
-    print("Departures-losses ratio: ", data.dep / data.los)
-    print("Departures percentage: {:.1f}%".format(data.dep / data.arr * 100))
+    print("\nArrival rate: ", data.arrivals / time, " - Departure rate: ", data.departures / time)
+    print("Loss rate: ", data.losses / time, " - Packets loss: ", data.losses)
+    print("Departures-losses ratio: ", data.departures / data.losses)
+    print("Departures percentage: {:.1f}%".format(data.departures / data.arrivals * 100))
 
-    print("\nAverage number of users: ", data.ut / time)
-    print("Average delay: ", data.delay / data.dep)
+    print("\nAverage number of users: ", data.average_users / time)
+    print("Average delay: ", data.delay / data.departures)

@@ -1,17 +1,18 @@
 import json
 import random
-from queue import PriorityQueue
-from utils.queues import BatteryStatus, Battery, Packet
-from utils.measurements import Statistics, Measurements
 from enum import Enum
+from queue import PriorityQueue
+
 import arrivals_profile
+from utils.measurements import Measurement, Measurements
+from utils.queues import BatteryStatus, Battery, Packet
 
 # LEGEND:
 #   - FES: Finite Event Schedule
 
 variables = {}
 MMms = {}
-data = Statistics()
+data = Measurement()
 measurements = Measurements()
 
 
@@ -63,9 +64,10 @@ def send_drone(time, FES: PriorityQueue, drone_id, desired_time=0):
         tot_time = drone.battery.residual
     else:
         tot_time = min(desired_time, drone.battery.residual)
-    FES.put((time + tot_time, Event.SWITCH_OFF, drone_id, tot_time))
+    if not drone.battery.is_infinite():
+        FES.put((time + tot_time, Event.SWITCH_OFF, drone_id, tot_time))
     data.drones += 1
-    add_data_record(time)
+    measurements.add_measurement(measurement=data)
 
 
 def request_drone(time):
@@ -94,7 +96,7 @@ def schedule_recharge(time, FES: PriorityQueue, drone_id):
     """
     FES.put((time + Battery.RECHARGE_TIME, Event.RECHARGE, drone_id, None))
     data.charging_drones += 1
-    add_data_record(time)
+    measurements.add_measurement(measurement=data)
     req_drone = request_drone(time)
     if req_drone is not None:
         send_drone(time, FES, req_drone)
@@ -113,7 +115,7 @@ def evt_switch_off(time, FES: PriorityQueue, drone_id, tot_time):
     else:
         drone.switch_off(empty_battery=False)
     data.drones -= 1
-    add_data_record(time)
+    measurements.add_measurement(measurement=data)
 
 
 def evt_recharge(time, drone_id):
@@ -123,7 +125,7 @@ def evt_recharge(time, drone_id):
     drone = MMms[drone_id]
     drone.battery_recharge()
     data.charging_drones -= 1
-    add_data_record(time)
+    measurements.add_measurement(measurement=data)
 
 
 def evt_arrival(time, FES: PriorityQueue):
@@ -137,7 +139,7 @@ def evt_arrival(time, FES: PriorityQueue):
         req_drone_id = request_drone(time)
         if req_drone_id is not None:
             send_drone(time, FES, req_drone_id)
-        data.los += 1
+        data.losses += 1
     else:
         data.users += 1
         # create a record for the client
@@ -163,11 +165,11 @@ def evt_arrival(time, FES: PriorityQueue):
     FES.put((time + inter_arrival, Event.ARRIVAL, None, None))
 
     # cumulate statistics
-    data.arr += 1
-    data.ut += data.users * (time - data.oldT)  # average users per time unit
-    data.oldT = time
+    data.arrivals += 1
+    data.average_users += data.users * (time - data.time)  # average users per time unit
+    data.time = time
     # measurements
-    add_data_record(time)
+    measurements.add_measurement(measurement=data)
 
 
 def evt_departure(time, FES, drone_id, server_id):
@@ -180,9 +182,9 @@ def evt_departure(time, FES, drone_id, server_id):
     # losses management
     loss = drone.battery.status != BatteryStatus.IN_USE
     if loss:
-        data.los += 1
+        data.losses += 1
     else:
-        data.dep += 1
+        data.departures += 1
         # get the first element from the queue
         client = drone.consume(server_id)
 
@@ -201,14 +203,7 @@ def evt_departure(time, FES, drone_id, server_id):
             FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
 
     # cumulate statistics
-    data.ut += data.users * (time - data.oldT)
-    data.oldT = time
+    data.average_users += data.users * (time - data.time)
+    data.time = time
     # measurements
-    add_data_record(time)
-
-
-def add_data_record(time):
-    """
-    Used to collect data to be plotted
-    """
-    measurements.add_record(time=time, data=data)
+    measurements.add_measurement(measurement=data)

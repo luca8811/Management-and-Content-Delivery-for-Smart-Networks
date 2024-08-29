@@ -14,6 +14,7 @@ class Server:
 
 
 residual_time_max = {
+    "INF": 0,
     "BAT": 25 * 60,
     "W45": 35 * 60,
     "W65": 40 * 60,
@@ -43,6 +44,9 @@ class Battery:
             self.residual = self._max_residual_time
         else:
             self.residual = residual_time_max["BAT"]
+
+    def is_infinite(self):
+        return self._max_residual_time == residual_time_max["INF"]
 
 
 class MMmB:
