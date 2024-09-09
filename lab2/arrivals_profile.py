@@ -6,7 +6,8 @@ use_custom_profile = True
 
 # Definition of interpolation nodes
 t_nodes = np.array([0, 5, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 23, 24])
-A_nodes = np.array([1, 1, 2, 3, 5, 5, 3, 2, 3, 5, 5, 2, 1, 1]) / 5
+# A_nodes = np.array([1, 1, 2, 3, 5, 5, 3, 2, 3, 5, 5, 2, 1, 1]) / 5
+A_nodes = np.array([3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]) / 5
 
 # Creation of linear interpolation function
 linear_interp = interp1d(t_nodes, A_nodes, kind='linear')

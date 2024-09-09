@@ -1,4 +1,24 @@
 {
+  "TASK1": {
+    "BASE_SERVICE_RATE": 20,
+    "BASE_BUFFER_SIZE": 10,
+    "ARRIVAL_RATE": 5,
+    "drone_types": {
+      "A": {
+        "POW": "BAT",
+        "m_ANTENNAS": 1,
+        "SERVICE_RATE": 1,
+        "BUFFER_SIZE": 10
+      }
+    },
+    "configurations": {
+      "I": [
+        "A"
+      ]
+    },
+    "STARTING_TIME": 28800,
+    "SIM_TIME": 50000
+  },
   "TASK4": {
     "BASE_SERVICE_RATE": 5,
     "BASE_BUFFER_SIZE": 100,

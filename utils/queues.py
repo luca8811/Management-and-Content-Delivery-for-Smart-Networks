@@ -1,6 +1,7 @@
 import random
 from enum import Enum
 
+
 class Packet:
     def __init__(self, arrival_time):
         self.arrival_time = arrival_time
@@ -44,10 +45,10 @@ class Battery:
     MAX_CYCLES = 3
 
     def __init__(self, power_supply: str):
-        self._max_residual_time = residual_time_max[power_supply]
-        self.residual = 0
-        self.status = BatteryStatus.FULL
-        self.complete_cycles = 0
+        self._max_residual_time: int = residual_time_max[power_supply]
+        self.residual: int = 0
+        self.status: BatteryStatus = BatteryStatus.FULL
+        self.complete_cycles: int = 0
 
     def init_battery(self, solar_panel=False):
         if solar_panel:
@@ -61,12 +62,29 @@ class Battery:
 
 class MMmB:
     def __init__(self, power_supply: str, service_times: list[float], buffer_size=0):
-        self.buffer_size = buffer_size
-        self.battery = Battery(power_supply)
-        self._queue = []
-        self._servers = {i: Server(service_times[i]) for i in range(len(service_times))}
-        self._rr_scheduling = list(self._servers.keys())
+        self.buffer_size = buffer_size  # B
+        self.battery: Battery = Battery(power_supply)
+        self._queue: list[Packet] = []
+        self._servers: dict[int, Server] = {i: Server(service_times[i]) for i in range(len(service_times))}
+        self._rr_scheduling: list[int] = list(self._servers.keys())
         self._scheduling_policy = self._get_server_fastest
+
+    def battery_recharge(self):
+        self.battery.status = BatteryStatus.FULL
+        self.battery.complete_cycles += 1
+
+    def battery_consume(self, usage_time):
+        self.battery.residual -= usage_time
+
+    def switch_on(self, solar_panel=False):
+        self.battery.status = BatteryStatus.IN_USE
+        self.battery.init_battery(solar_panel=solar_panel)
+
+    def switch_off(self, empty_battery=True):
+        for server in self._servers.values():
+            server.idle = True
+        self._queue.clear()
+        self.battery.status = BatteryStatus.EMPTY if empty_battery else BatteryStatus.PAUSED
 
     def insert(self, packet: Packet):
         """
