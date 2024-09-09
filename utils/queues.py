@@ -1,16 +1,26 @@
 import random
 from enum import Enum
 
-
 class Packet:
     def __init__(self, arrival_time):
         self.arrival_time = arrival_time
+        self.start_service_time = None
 
 
 class Server:
     def __init__(self, service_time):
-        self.idle = True  # whether the server is idle or not
-        self.service_time = service_time  # service period specific for this server
+        self.idle = True
+        self.service_time = service_time
+        self.total_time_engaged = 0.0
+        self.selection_count = 0
+
+    def engage(self, service_duration):
+        self.idle = False
+        self.total_time_engaged += service_duration
+        self.selection_count += 1
+
+    def release(self):
+        self.idle = True
 
 
 residual_time_max = {
@@ -34,10 +44,10 @@ class Battery:
     MAX_CYCLES = 3
 
     def __init__(self, power_supply: str):
-        self._max_residual_time: int = residual_time_max[power_supply]
-        self.residual: int = 0
-        self.status: BatteryStatus = BatteryStatus.FULL
-        self.complete_cycles: int = 0
+        self._max_residual_time = residual_time_max[power_supply]
+        self.residual = 0
+        self.status = BatteryStatus.FULL
+        self.complete_cycles = 0
 
     def init_battery(self, solar_panel=False):
         if solar_panel:
@@ -51,39 +61,40 @@ class Battery:
 
 class MMmB:
     def __init__(self, power_supply: str, service_times: list[float], buffer_size=0):
-        self.buffer_size = buffer_size  # B
-        self.battery: Battery = Battery(power_supply)
-        self._queue: list[Packet] = []
-        self._servers: dict[int, Server] = {i: Server(service_times[i]) for i in range(len(service_times))}
-        self._rr_scheduling: list[int] = list(self._servers.keys())
+        self.buffer_size = buffer_size
+        self.battery = Battery(power_supply)
+        self._queue = []
+        self._servers = {i: Server(service_times[i]) for i in range(len(service_times))}
+        self._rr_scheduling = list(self._servers.keys())
         self._scheduling_policy = self._get_server_fastest
 
-    def battery_recharge(self):
-        self.battery.status = BatteryStatus.FULL
-        self.battery.complete_cycles += 1
-
-    def battery_consume(self, usage_time):
-        self.battery.residual -= usage_time
-
-    def switch_on(self, solar_panel=False):
-        self.battery.status = BatteryStatus.IN_USE
-        self.battery.init_battery(solar_panel=solar_panel)
-
-    def switch_off(self, empty_battery=True):
-        for server in self._servers.values():
-            server.idle = True
-        self._queue.clear()
-        self.battery.status = BatteryStatus.EMPTY if empty_battery else BatteryStatus.PAUSED
-
     def insert(self, packet: Packet):
-        assert not self.is_queue_full()
-        self._queue.append(packet)
+        """
+        Insert a packet into the queue. If the buffer size is 0, the packet is discarded.
+        """
+        if self.buffer_size == 0:
+            # Buffer is 0, so the packet should be discarded unless a server is free immediately.
+            if self.can_engage_server():
+                self._queue.append(packet)
+            else:
+                raise OverflowError("Buffer size is 0, and no server is free. Packet is discarded.")
+        else:
+            # Regular insertion
+            if not self.is_queue_full():
+                self._queue.append(packet)
+            else:
+                raise OverflowError("Buffer is full. Packet is discarded.")
 
     def queue_size(self):
         return len(self._queue)
 
     def is_queue_full(self):
-        return self.queue_size() == self.buffer_size and self.buffer_size > 0
+        """
+        Check if the queue is full. If buffer_size is 0, the queue is always considered full.
+        """
+        if self.buffer_size == 0:
+            return True
+        return len(self._queue) == self.buffer_size
 
     def _get_servers_working(self):
         return [server.idle for server in self._servers.values()].count(False)
@@ -92,7 +103,13 @@ class MMmB:
         return [k for k, v in self._servers.items() if v.idle]
 
     def can_engage_server(self):
+        """
+        Determine if any servers are available to start serving a packet.
+        """
         n_servers_w = self._get_servers_working()
+        # If buffer_size is 0, we check if there's an immediate slot for processing.
+        if self.buffer_size == 0:
+            return n_servers_w < len(self._servers)
         return n_servers_w < len(self._servers) and n_servers_w < self.queue_size()
 
     def _get_server_random(self):
@@ -120,8 +137,11 @@ class MMmB:
 
     def consume(self, server_id):
         assert self._get_servers_working() > 0
-        self._servers[server_id].idle = True
-        return self._queue.pop(0)
+        if self.queue_size() > 0:
+            self._servers[server_id].idle = True
+            return self._queue.pop(0)
+        else:
+            raise IndexError("Attempted to consume from an empty queue")
 
     def get_last(self):
         return self._queue[-1]
