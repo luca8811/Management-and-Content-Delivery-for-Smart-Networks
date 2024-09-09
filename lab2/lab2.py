@@ -205,5 +205,6 @@ def evt_departure(time, FES, drone_id, server_id):
     # cumulate statistics
     data.average_users += data.users * (time - data.time)
     data.time = time
+    data.average_delay = data.delay / data.departures
     # measurements
     measurements.add_measurement(measurement=data)
