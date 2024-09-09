@@ -1,0 +1,14 @@
+# Ignora le cartelle __pycache__ in tutto il progetto
+__pycache__/
+
+# Ignora i file .pyc generati da Python
+*.pyc
+
+# Ignora l'intera cartella .idea, che contiene file di configurazione di PyCharm
+.idea/
+
+# Ignora tutti i file .iml (file di configurazione di progetto di IntelliJ/IDEA/PyCharm)
+*.iml
+
+# Ignora i file .xml all'interno della cartella .idea (configurazioni specifiche dell'IDE)
+.idea/*.xml
