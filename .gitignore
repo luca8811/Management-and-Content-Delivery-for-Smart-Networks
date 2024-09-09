@@ -12,4 +12,3 @@ __pycache__/
 
 # Ignora i file .xml all'interno della cartella .idea (configurazioni specifiche dell'IDE)
 .idea/*.xml
->>>>>>> stefano
