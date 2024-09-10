@@ -16,8 +16,29 @@
         "A"
       ]
     },
-    "STARTING_TIME": 28800,
+    "STARTING_TIME": 0,
     "SIM_TIME": 50000
+  },
+  "TASK2": {
+    "BASE_SERVICE_RATE": 2,
+    "BASE_BUFFER_SIZE": 1,
+    "ARRIVAL_RATE": 1,
+    "drone_types": {
+      "A": {
+        "POW": "BAT",
+        "m_ANTENNAS": 1,
+        "SERVICE_RATE": 2,
+        "BUFFER_SIZE": 1
+      }
+    },
+    "configurations": {
+      "I": [
+        "A"
+      ]
+    },
+    "STARTING_TIME": 28800,
+    "SIM_TIME": 86400,
+    "WORKING_SLOTS": [[28800, 43200],[50400, 57600]]
   },
   "TASK4": {
     "BASE_SERVICE_RATE": 5,

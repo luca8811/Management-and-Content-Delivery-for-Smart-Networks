@@ -163,3 +163,10 @@ class MMmB:
 
     def get_last(self):
         return self._queue[-1]
+
+    @staticmethod
+    def is_in_working_slot(time, working_slots):
+        for slot in working_slots:
+            if slot[0] <= time <= slot[1]:
+                return True
+        return False
