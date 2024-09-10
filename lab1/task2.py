@@ -162,11 +162,8 @@ if __name__ == '__main__':
                     results_data['buffer_occupancy'].append(average_buffer_occupancy)
                     results_data['busy_time_ratio'].append(busy_time_ratio)
 
-    # Genera i grafici
-    plt.figure(figsize=(10, 8))
-
     # Grafico 1: Ritardo medio vs Tasso di arrivo (con scala logaritmica)
-    plt.subplot(2, 2, 1)
+    plt.figure(figsize=(8, 6))
     for buffer_size in buffer_sizes:
         for scenario in scenarios:
             x = [results_data['arrival_rate'][i] for i in range(len(results_data['scenario']))
@@ -180,9 +177,10 @@ if __name__ == '__main__':
     plt.ylabel('Average Delay (log scale)')
     plt.legend(loc='upper right')
     plt.grid(True)
+    plt.show()
 
     # Grafico 2: Tasso di perdita vs Tasso di arrivo (normale)
-    plt.subplot(2, 2, 2)
+    plt.figure(figsize=(8, 6))
     for buffer_size in buffer_sizes:
         for scenario in scenarios:
             x = [results_data['arrival_rate'][i] for i in range(len(results_data['scenario']))
@@ -195,9 +193,10 @@ if __name__ == '__main__':
     plt.ylabel('Loss Rate')
     plt.legend(loc='upper right')
     plt.grid(True)
+    plt.show()
 
     # Grafico 3: Occupazione del buffer vs Tasso di arrivo (con scala logaritmica)
-    plt.subplot(2, 2, 3)
+    plt.figure(figsize=(8, 6))
     for buffer_size in buffer_sizes:
         for scenario in scenarios:
             x = [results_data['arrival_rate'][i] for i in range(len(results_data['scenario']))
@@ -211,9 +210,10 @@ if __name__ == '__main__':
     plt.ylabel('Buffer Occupancy (log scale)')
     plt.legend(loc='upper right')
     plt.grid(True)
+    plt.show()
 
     # Grafico 4: Busy Time Ratio vs Tasso di arrivo (normale)
-    plt.subplot(2, 2, 4)
+    plt.figure(figsize=(8, 6))
     for buffer_size in buffer_sizes:
         for scenario in scenarios:
             x = [results_data['arrival_rate'][i] for i in range(len(results_data['scenario']))
@@ -226,7 +226,4 @@ if __name__ == '__main__':
     plt.ylabel('Busy Time Ratio')
     plt.legend(loc='upper right')
     plt.grid(True)
-
-    # Mostra i grafici
-    plt.tight_layout()
     plt.show()

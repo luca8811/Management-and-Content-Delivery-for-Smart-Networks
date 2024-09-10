@@ -2,17 +2,18 @@ import random
 from queue import PriorityQueue
 from scipy.stats import t
 import math
+import numpy as np
 import matplotlib.pyplot as plt
 from utils.queues import MMmB, Packet
 from utils.measurements import Measurement
 
 # Fixed service time
-SERVICE = 20.0  # Constant service time for simplicity
+SERVICE = 15.0  # Constant service time for simplicity
 # Initialize variables for simulation
-BUFFER_SIZE = 0  # No buffer scenario as per Task 1
+BUFFER_SIZE = 0 # No buffer scenario as per Task 1
 SERVICE_TIMES = [SERVICE]  # One service unit, fixed service time
 SIM_TIME = 500000  # Simulation time in some units
-ARRIVAL_RATES = [0.5, 1, 5, 10]  # Arrival rates to be tested
+ARRIVAL_RATES = [0.2, 0.5, 0.7, 1]  # Arrival rates to be tested
 CONFIDENCE_LEVEL = 0.95  # Desired confidence level
 
 
@@ -136,38 +137,49 @@ if __name__ == '__main__':
 
     # Grafici
 
-    # Grafico 1: Tasso di perdita vs Tasso di arrivo
-    plt.figure()
-    plt.plot(ARRIVAL_RATES, loss_rates, marker='o', linestyle='-', color='r')
+    # Set a consistent style for better visual appearance
+    plt.style.use('ggplot')
+
+    # Grafico 1: Average Delay vs Arrival Rate
+    plt.figure(figsize=(8, 6))
+    plt.plot(ARRIVAL_RATES, delays, marker='o')
+    plt.title('Average Delay vs Arrival Rate')
+    plt.xlabel('Arrival Rate')
+    plt.ylabel('Average Delay')
+    plt.grid(True)
+    plt.show()
+
+    # Grafico 2: Loss Rate vs Arrival Rate
+    plt.figure(figsize=(8, 6))
+    plt.plot(ARRIVAL_RATES, loss_rates, marker='o', color='red')
     plt.title('Loss Rate vs Arrival Rate')
-    plt.xlabel('Arrival Rate (packets per time unit)')
+    plt.xlabel('Arrival Rate')
     plt.ylabel('Loss Rate')
     plt.grid(True)
     plt.show()
 
-    # Grafico 2: Ritardo medio vs Tasso di arrivo
-    plt.figure()
-    plt.plot(ARRIVAL_RATES, delays, marker='o', linestyle='-', color='b')
-    plt.title('Average Delay vs Arrival Rate')
-    plt.xlabel('Arrival Rate (packets per time unit)')
-    plt.ylabel('Average Delay (time units)')
+    # Grafico 3: Average Number of Users vs Arrival Rate
+    plt.figure(figsize=(8, 6))
+    plt.plot(ARRIVAL_RATES, average_users_list, marker='o', color='green')
+    plt.title('Average Number of Users vs Arrival Rate')
+    plt.xlabel('Arrival Rate')
+    plt.ylabel('Average Number of Users')
     plt.grid(True)
     plt.show()
 
-    # Grafico 3: Numero medio di utenti nel sistema vs Tasso di arrivo
-    plt.figure()
-    plt.plot(ARRIVAL_RATES, average_users_list, marker='o', linestyle='-', color='g')
-    plt.title('Average Users in System vs Arrival Rate')
-    plt.xlabel('Arrival Rate (packets per time unit)')
-    plt.ylabel('Average Users')
+    # Plot for task 1.b: Confidence Intervals for Average Delay
+    ci_lower, ci_upper = compute_t_confidence_interval(delays, CONFIDENCE_LEVEL)
+
+    plt.figure(figsize=(8, 6))
+
+    # Confidence interval plot for Average Delay
+    plt.errorbar(ARRIVAL_RATES, delays,
+                 yerr=[delays - ci_lower, ci_upper - delays],
+                 fmt='o', capsize=5, capthick=2, ecolor='blue')
+    plt.title(f'Average Delay with {CONFIDENCE_LEVEL * 100}% Confidence Interval')
+    plt.xlabel('Arrival Rate')
+    plt.ylabel('Average Delay')
+
     plt.grid(True)
     plt.show()
 
-    # Grafico 4: Intervallo di confidenza per il Ritardo medio
-    plt.figure()
-    plt.errorbar(ARRIVAL_RATES, delays, yerr=[ci_upper - delays[0]] * len(ARRIVAL_RATES), fmt='o', color='purple')
-    plt.title('Confidence Interval for Average Delay')
-    plt.xlabel('Arrival Rate (packets per time unit)')
-    plt.ylabel('Average Delay (with 95% CI)')
-    plt.grid(True)
-    plt.show()
