@@ -153,12 +153,13 @@ def evt_arrival(time, FES: PriorityQueue):
         if drone.can_engage_server():
             # Check if we are in a useful work slot
             if drone.is_in_working_slot(time, variables["WORKING_SCHEDULING"]["I"]):
-                (s_id, s_service_time) = drone.engage_server()
-                # sample the service time
-                service_time = random.expovariate(1.0 / s_service_time)
+                if not drone.has_exceeded_max_complete_cycles(variables["RECHARGE_CONSTRAINT"]["IV"]):
+                    (s_id, s_service_time) = drone.engage_server()
+                    # sample the service time
+                    service_time = random.expovariate(1.0 / s_service_time)
 
-                # schedule when the client will finish the service
-                FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
+                    # schedule when the client will finish the service
+                    FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
 
     # sample the time until the next event
     current_arrival_percentage = arrivals_profile.arrivals_profile[int(time / 3600)]
@@ -201,9 +202,13 @@ def evt_departure(time, FES, drone_id, server_id):
         if drone.can_engage_server():
             # Check if we are in a useful work slot
             if drone.is_in_working_slot(time, variables["WORKING_SCHEDULING"]["I"]):
-                (s_id, s_service_time) = drone.engage_server()
-                # sample the service time
-                service_time = random.expovariate(1.0 / s_service_time)
+                if not drone.has_exceeded_max_complete_cycles(variables["RECHARGE_CONSTRAINT"]["IV"]):
+                    (s_id, s_service_time) = drone.engage_server()
+                    # sample the service time
+                    service_time = random.expovariate(1.0 / s_service_time)
+
+                    # schedule when the client will finish the service
+                    FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
 
                 # schedule when the client will finish the service
                 FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))

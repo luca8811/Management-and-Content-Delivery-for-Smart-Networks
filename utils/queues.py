@@ -170,3 +170,10 @@ class MMmB:
             if slot[0] <= time <= slot[1]:
                 return True
         return False
+
+    def has_exceeded_max_complete_cycles(self, maximum_recharge_cycles):
+        """
+        Returns True if the number of charging cycles completed by the battery
+        is greater than or equal to the maximum limit of charging cycles.
+        """
+        return self.battery.complete_cycles >= maximum_recharge_cycles
