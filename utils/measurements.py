@@ -17,6 +17,7 @@ class Measurement:
         self.average_users = 0  # Changed from 'ut'
         self.delay = 0
         self.average_delay = 0
+        self.average_losses = 0
         self.transmitted_packets = 0  # Number of transmitted packets
         self.average_packets = 0  # Sum of packets in the system for calculating average
         self.queue_delay = 0  # Total queue delay

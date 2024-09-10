@@ -2,6 +2,7 @@ import json
 import random
 from enum import Enum
 from queue import PriorityQueue
+import numpy as np
 
 import arrivals_profile
 from utils.measurements import Measurement, Measurements
@@ -183,6 +184,7 @@ def evt_departure(time, FES, drone_id, server_id):
     loss = drone.battery.status != BatteryStatus.IN_USE
     if loss:
         data.losses += 1
+        data.average_losses = data.losses / data.arrivals
     else:
         data.departures += 1
         # get the first element from the queue
@@ -208,3 +210,43 @@ def evt_departure(time, FES, drone_id, server_id):
     data.average_delay = data.delay / data.departures
     # measurements
     measurements.add_measurement(measurement=data)
+
+
+def calculate_warmup_period(measurements, window_size=10, threshold=0.0001, stable_period=50):
+    """
+    Calcola il warm-up period in modo dinamico utilizzando una media mobile e una soglia di variazione.
+    Parametri:
+        - measurements: oggetto Measurements che contiene i dati della simulazione.
+        - window_size: dimensione della finestra per la media mobile.
+        - threshold: soglia di variazione relativa per determinare quando il sistema è stabile.
+        - stable_period: numero di campioni consecutivi che devono essere stabili per considerare concluso il warm-up.
+    Restituisce:
+        - Il tempo in cui il warm-up period termina (in secondi).
+    """
+    # Estrai i dati di average delay e tempo
+    lot = list(map(lambda m: (m.average_delay, m.time), measurements.history))
+    average_delay, time = list(zip(*lot))
+
+    # Calcola la media mobile sul average delay
+    moving_avg = np.convolve(average_delay, np.ones(window_size) / window_size, mode='valid')
+
+    stable_count = 0  # Conta il numero di campioni stabili consecutivi
+
+    # Identifica il warm-up period analizzando la variazione relativa tra medie mobili successive
+    for i in range(1, len(moving_avg)):
+        variation = abs((moving_avg[i] - moving_avg[i - 1]) / moving_avg[i - 1])
+
+        # Se la variazione è minore della soglia, aumentiamo il contatore
+        if variation < threshold:
+            stable_count += 1
+        else:
+            stable_count = 0  # Reset del contatore se c'è troppa variazione
+
+        # Se abbiamo un numero sufficiente di campioni stabili, consideriamo il warm-up period finito
+        if stable_count >= stable_period:
+            warmup_period_index = i + window_size - stable_period  # Aggiusta per l'indicizzazione e il periodo stabile
+            warmup_period_time = time[warmup_period_index]  # Ottieni il tempo corrispondente
+            return warmup_period_time
+
+    # Se non troviamo un punto di stabilità, restituisci il tempo massimo (fine dei dati)
+    return time[-1]
