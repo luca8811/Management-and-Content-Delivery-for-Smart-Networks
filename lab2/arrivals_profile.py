@@ -2,7 +2,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 
-use_custom_profile = True
+use_custom_profile = False
 
 # Definition of interpolation nodes
 t_nodes = np.array([0, 5, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 23, 24])

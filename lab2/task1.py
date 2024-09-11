@@ -47,7 +47,7 @@ if __name__ == '__main__':
             evt_recharge(time, drone_id)
 
     results_visualization.STARTING_TIME = variables['STARTING_TIME']
-    # results_visualization.plot_users(measurements)
+    results_visualization.plot_users(measurements)
     # results_visualization.plot_arrivals(measurements)
     # results_visualization.plot_departures(measurements)
     # results_visualization.plot_losses(measurements)
@@ -59,6 +59,7 @@ if __name__ == '__main__':
     # results_visualization.plot_average_delay_over_time_logarithmic(measurements)
     warmup_period = calculate_warmup_period(measurements)
     results_visualization.plot_average_delay_with_warmup(measurements, warmup_period)
+    results_visualization.plot_average_users_over_time_logarithmic(measurements)
 
     # print output data
     print("MEASUREMENTS \n\nNo. of users in the queue:", data.users, "\nNo. of arrivals =",

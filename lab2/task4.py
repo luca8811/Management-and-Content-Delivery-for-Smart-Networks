@@ -46,10 +46,10 @@ if __name__ == '__main__':
         elif event_type == Event.RECHARGE:
             evt_recharge(time, drone_id)
     results_visualization.STARTING_TIME = variables['STARTING_TIME']
-    # results_visualization.plot_users(measurements)
-    # results_visualization.plot_arrivals(measurements)
-    # results_visualization.plot_departures(measurements)
-    # results_visualization.plot_losses(measurements)
+    results_visualization.plot_users(measurements)
+    results_visualization.plot_arrivals(measurements)
+    results_visualization.plot_departures(measurements)
+    results_visualization.plot_losses(measurements)
     results_visualization.plot_dep_los(measurements)
     # results_visualization.plot_drones(measurements)
     # results_visualization.plot_delay(measurements)

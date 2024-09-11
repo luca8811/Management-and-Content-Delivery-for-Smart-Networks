@@ -35,21 +35,34 @@ class Event(Enum):
     RECHARGE = 4
 
 
-def assign_packet_to_drone():
-    """
-    When a packet arrives, we want it to be assigned to a running drone.
-    It returns the id of the fastest (highest capacity) drone, if any
-    available (running and with space inside its queue).
-    """
+def is_drone_available(time, drone: MMms):
+    return (drone.is_in_working_slot(time, variables["WORKING_SCHEDULING"]["IV"])
+            and not drone.has_exceeded_max_complete_cycles(variables["RECHARGE_CONSTRAINT"]["I"])
+            and drone.battery.status == BatteryStatus.IN_USE
+            and not drone.is_queue_full())
 
-    def is_available(drone: tuple[int, MMms]):
-        return drone[1].battery.status == BatteryStatus.IN_USE and not drone[1].is_queue_full()
 
-    drones = list(filter(is_available, MMms.items()))
-    if len(drones) > 0:
-        drones = sorted(drones, key=lambda drone: drone[1].get_capacity(), reverse=True)
-        return drones[0][0]
-    return None
+def assign_packet_to_drone(time):
+    # """
+    # When a packet arrives, we want it to be assigned to a running drone.
+    # It returns the id of the fastest (highest capacity) drone, if any
+    # available (running and with space inside its queue).
+    # """
+    #
+    # def is_available(drone: tuple[int, MMms]):
+    #     return drone[1].battery.status == BatteryStatus.IN_USE and not drone[1].is_queue_full()
+    #
+    # drones = list(filter(is_available, MMms.items()))
+    # if len(drones) > 0:
+    #     drones = sorted(drones, key=lambda drone: drone[1].get_capacity(), reverse=True)
+    #     return drones[0][0]
+    # return None
+    requested_drone_id = random.choice(list(MMms.keys()))
+    drone = MMms[requested_drone_id]
+    if is_drone_available(time, drone):
+        return requested_drone_id
+    else:
+        return None
 
 
 def send_drone(time, FES: PriorityQueue, drone_id, desired_time=0):
@@ -111,6 +124,7 @@ def evt_switch_off(time, FES: PriorityQueue, drone_id, tot_time):
     drone = MMms[drone_id]
     drone.battery_consume(usage_time=tot_time)
     if drone.battery.residual == 0:
+        data.users -= drone.queue_size()
         drone.switch_off(empty_battery=True)
         schedule_recharge(time, FES, drone_id)
     else:
@@ -134,7 +148,7 @@ def evt_arrival(time, FES: PriorityQueue):
     Called when there's an arrival packet.
     """
     # loss management - boolean result
-    drone_id = assign_packet_to_drone()
+    drone_id = assign_packet_to_drone(time)
     loss = drone_id is None
     if loss:
         req_drone_id = request_drone(time)
@@ -151,15 +165,12 @@ def evt_arrival(time, FES: PriorityQueue):
 
         # if the server is idle start the service
         if drone.can_engage_server():
-            # Check if we are in a useful work slot
-            if drone.is_in_working_slot(time, variables["WORKING_SCHEDULING"]["I"]):
-                if not drone.has_exceeded_max_complete_cycles(variables["RECHARGE_CONSTRAINT"]["IV"]):
-                    (s_id, s_service_time) = drone.engage_server()
-                    # sample the service time
-                    service_time = random.expovariate(1.0 / s_service_time)
+            (s_id, s_service_time) = drone.engage_server()
+            # sample the service time
+            service_time = random.expovariate(1.0 / s_service_time)
 
-                    # schedule when the client will finish the service
-                    FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
+            # schedule when the client will finish the service
+            FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
 
     # sample the time until the next event
     current_arrival_percentage = arrivals_profile.arrivals_profile[int(time / 3600)]
@@ -189,6 +200,7 @@ def evt_departure(time, FES, drone_id, server_id):
         data.losses += 1
         data.average_losses = data.losses / data.arrivals
     else:
+        data.users -= 1
         data.departures += 1
         # get the first element from the queue
         client = drone.consume(server_id)
@@ -196,22 +208,15 @@ def evt_departure(time, FES, drone_id, server_id):
         # do whatever we need to do when clients go away
 
         data.delay += (time - client.arrival_time)
-        data.users -= 1
 
         # see whether there are more clients to in the line
         if drone.can_engage_server():
-            # Check if we are in a useful work slot
-            if drone.is_in_working_slot(time, variables["WORKING_SCHEDULING"]["I"]):
-                if not drone.has_exceeded_max_complete_cycles(variables["RECHARGE_CONSTRAINT"]["IV"]):
-                    (s_id, s_service_time) = drone.engage_server()
-                    # sample the service time
-                    service_time = random.expovariate(1.0 / s_service_time)
+            (s_id, s_service_time) = drone.engage_server()
+            # sample the service time
+            service_time = random.expovariate(1.0 / s_service_time)
 
-                    # schedule when the client will finish the service
-                    FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
-
-                # schedule when the client will finish the service
-                FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
+            # schedule when the client will finish the service
+            FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
 
     # cumulate statistics
     data.average_users += data.users * (time - data.time)

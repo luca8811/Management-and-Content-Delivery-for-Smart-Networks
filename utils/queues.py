@@ -108,11 +108,9 @@ class MMmB:
 
     def is_queue_full(self):
         """
-        Check if the queue is full. If buffer_size is 0, the queue is always considered full.
+        Check if the queue is full. Buffer size = 0 => infinite dimension buffer.
         """
-        if self.buffer_size == 0:
-            return True
-        return len(self._queue) == self.buffer_size
+        return len(self._queue) == self.buffer_size and self.buffer_size > 0
 
     def _get_servers_working(self):
         return [server.idle for server in self._servers.values()].count(False)
@@ -176,4 +174,7 @@ class MMmB:
         Returns True if the number of charging cycles completed by the battery
         is greater than or equal to the maximum limit of charging cycles.
         """
-        return self.battery.complete_cycles >= maximum_recharge_cycles
+        if maximum_recharge_cycles == "inf":
+            return False
+        else:
+            return self.battery.complete_cycles >= maximum_recharge_cycles

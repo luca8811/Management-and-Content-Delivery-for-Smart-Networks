@@ -164,3 +164,18 @@ def plot_average_delay_with_warmup(measurements, warmup_end_time):
     output_filename = "./report_images/warmup_average_delay_over_time.png"
     plt.savefig(output_filename)
     plt.close()
+
+
+def plot_average_users_over_time_logarithmic(measurements: Measurements):
+    lot = list(map(lambda m: (m.average_users, m.time), measurements.history))
+    avg_users, time = list(zip(*lot))
+    plt.figure(figsize=(10, 6))
+    plt.plot(time, avg_users, label="Average Users")
+    plt.title("Average Users Over Time (log scale)")
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("Average Users (units)")
+    plt.legend()
+    plt.grid(True)
+    output_filename = "./report_images/average_users_over_time_logarithmic_scale.png"
+    plt.savefig(output_filename)
+    plt.close()
