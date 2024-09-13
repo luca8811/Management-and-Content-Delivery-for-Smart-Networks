@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import numpy as np
+import json
 from utils.measurements import Measurements
 
 STARTING_TIME = 0
@@ -15,6 +15,71 @@ def plot_users(measurements: Measurements):
     plt.grid()
     plt.title('Users over time')
     plt.show()
+
+
+def plot_users_with_warmup(measurements: Measurements, warmup_times):
+    plt.figure()
+
+    # Extract time and users from the measurements
+    lot = list(map(lambda m: (m.time, m.users), measurements.history))
+    times, users = list(zip(*lot))
+
+    # Plot the users over time
+    plt.plot(times, users)
+
+    # Add vertical dashed red lines at each warmup time
+    for warmup_time in warmup_times:
+        plt.axvline(x=warmup_time, color='r', linestyle='--',
+                    label=f'Warmup @ {warmup_time}' if warmup_time == warmup_times[0] else "")
+
+    # Labels and grid
+    plt.xlabel('time')
+    plt.ylabel('number of users')
+    plt.grid()
+    plt.title('Users over time with end of warm-up period')
+
+    # Save the figure
+    output_filename = "./report_images/average_users_over_time_with warmup.png"
+    plt.savefig(output_filename)
+    plt.close()
+
+
+def plot_users_with_steady_state(measurements: Measurements):
+
+    json_filepath = "./report_images/steady_state_working_slots.json"
+
+    plt.figure()
+
+    # Extract time and users from the measurements
+    lot = list(map(lambda m: (m.time, m.users), measurements.history))
+    times, users = list(zip(*lot))
+
+    # Plot the users over time
+    plt.plot(times, users)
+
+    # Load the steady-state working slots from the JSON file
+    with open(json_filepath, 'r') as json_file:
+        steady_state_slots = json.load(json_file)
+
+    # Add vertical blue lines for each steady-state slot
+    for slot in steady_state_slots:
+        start, end = slot
+        # Plot blue lines for both the start and the end of each steady-state period
+        plt.axvline(x=start, color='b', linestyle='--',
+                    label=f'Start steady @ {start}' if start == steady_state_slots[0][0] else "")
+        plt.axvline(x=end, color='b', linestyle='--',
+                    label=f'End steady @ {end}' if end == steady_state_slots[0][0] else "")
+
+    # Labels and grid
+    plt.xlabel('time')
+    plt.ylabel('number of users')
+    plt.grid()
+    plt.title('Users over time with steady state periods')
+
+    # Save the figure
+    output_filename = "./report_images/average_users_with_steady_state.png"
+    plt.savefig(output_filename)
+    plt.close()
 
 
 def plot_arrivals(measurements: Measurements):

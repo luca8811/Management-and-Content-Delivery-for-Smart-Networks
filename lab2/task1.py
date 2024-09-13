@@ -2,8 +2,12 @@ import random
 from queue import PriorityQueue
 import lab2
 import results_visualization
-from lab2 import Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, calculate_warmup_period
+from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, calculate_warmup_period, clear_folder,
+                  FilteredMeasurements)
 from utils.queues import MMmB
+import json
+
+clear_folder('./report_images')
 
 lab2.init_variables("TASK1")
 variables = lab2.variables
@@ -17,7 +21,9 @@ for i, drone_type in enumerate(variables['configurations']['I']):
     MMms[i] = MMmB(power_supply=drone['POW'],
                    service_times=[1 / (variables['BASE_SERVICE_RATE'] * drone['SERVICE_RATE'])
                                   for m in range(drone['m_ANTENNAS'])],
-                   buffer_size=variables['BASE_BUFFER_SIZE'] * drone['BUFFER_SIZE'])
+                   buffer_size=variables['BASE_BUFFER_SIZE'] * drone['BUFFER_SIZE'],
+                   maximum_recharge_cycles=variables["RECHARGE_CONSTRAINT"]["I"],
+                   working_slots=variables["WORKING_SCHEDULING"]["IV"])
 
 
 if __name__ == '__main__':
@@ -47,19 +53,39 @@ if __name__ == '__main__':
             evt_recharge(time, drone_id)
 
     results_visualization.STARTING_TIME = variables['STARTING_TIME']
-    results_visualization.plot_users(measurements)
+
+    warmup_period = calculate_warmup_period(buffer_size=variables['BASE_BUFFER_SIZE'] * drone['BUFFER_SIZE'],
+                                            measurements=measurements)
+    results_visualization.plot_users_with_warmup(measurements=measurements, warmup_times=warmup_period)
+    results_visualization.plot_users_with_steady_state(measurements=measurements)
+
+    # # Path to the steady state JSON file
+    steady_state_json_filepath = "./report_images/steady_state_working_slots.json"
+    with open(steady_state_json_filepath) as json_file:
+        steady_state_intervals = json.load(json_file)
+    filtered_measurements = FilteredMeasurements(measurements, steady_state_intervals)
+
+    # Now use filtered_measurements just like the original measurements
+    results_visualization.plot_users(filtered_measurements)
+    # results_visualization.plot_users(measurements)
+
+    results_visualization.plot_arrivals(filtered_measurements)
     # results_visualization.plot_arrivals(measurements)
+
+    results_visualization.plot_departures(filtered_measurements)
     # results_visualization.plot_departures(measurements)
+
+    results_visualization.plot_losses(filtered_measurements)
     # results_visualization.plot_losses(measurements)
+
+    results_visualization.plot_dep_los(filtered_measurements)
     # results_visualization.plot_dep_los(measurements)
+
+    results_visualization.plot_drones(filtered_measurements)
     # results_visualization.plot_drones(measurements)
+
+    results_visualization.plot_delay(filtered_measurements)
     # results_visualization.plot_delay(measurements)
-    results_visualization.plot_average_delay_over_departure_logarithmic(measurements)
-    results_visualization.plot_average_losses_over_time(measurements)
-    # results_visualization.plot_average_delay_over_time_logarithmic(measurements)
-    warmup_period = calculate_warmup_period(measurements)
-    results_visualization.plot_average_delay_with_warmup(measurements, warmup_period)
-    results_visualization.plot_average_users_over_time_logarithmic(measurements)
 
     # print output data
     print("MEASUREMENTS \n\nNo. of users in the queue:", data.users, "\nNo. of arrivals =",

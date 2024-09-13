@@ -17,3 +17,4 @@ __pycache__/
 .idea/*.xml
 
 /lab2/report_images
+lab2/prove.py

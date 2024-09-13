@@ -61,9 +61,11 @@ class Battery:
 
 
 class MMmB:
-    def __init__(self, power_supply: str, service_times: list[float], buffer_size=0):
+    def __init__(self, power_supply: str, service_times: list[float], buffer_size=0, maximum_recharge_cycles="inf", working_slots=[[0, 50000]]):
         self.buffer_size = buffer_size  # B
         self.battery: Battery = Battery(power_supply)
+        self.maximum_recharge_cycles = maximum_recharge_cycles
+        self.working_slots = working_slots
         self._queue: list[Packet] = []
         self._servers: dict[int, Server] = {i: Server(service_times[i]) for i in range(len(service_times))}
         self._rr_scheduling: list[int] = list(self._servers.keys())
@@ -162,19 +164,17 @@ class MMmB:
     def get_last(self):
         return self._queue[-1]
 
-    @staticmethod
-    def is_in_working_slot(time, working_slots):
-        for slot in working_slots:
+    def is_in_working_slot(self, time):
+        for slot in self.working_slots:
             if slot[0] <= time <= slot[1]:
                 return True
         return False
 
-    def has_exceeded_max_complete_cycles(self, maximum_recharge_cycles):
+    def has_exceeded_max_complete_cycles(self):
         """
         Returns True if the number of charging cycles completed by the battery
         is greater than or equal to the maximum limit of charging cycles.
         """
-        if maximum_recharge_cycles == "inf":
-            return False
-        else:
-            return self.battery.complete_cycles >= maximum_recharge_cycles
+        if not self.maximum_recharge_cycles == "inf":
+            return self.battery.complete_cycles >= self.maximum_recharge_cycles
+        return False

@@ -3,9 +3,12 @@ import random
 from enum import Enum
 from queue import PriorityQueue
 import numpy as np
+import os
+import shutil
+import json
 
 import arrivals_profile
-from utils.measurements import Measurement, Measurements
+from utils.measurements import Measurement, Measurements, FilteredMeasurements
 from utils.queues import BatteryStatus, Battery, Packet
 
 # LEGEND:
@@ -36,8 +39,8 @@ class Event(Enum):
 
 
 def is_drone_available(time, drone: MMms):
-    return (drone.is_in_working_slot(time, variables["WORKING_SCHEDULING"]["IV"])
-            and not drone.has_exceeded_max_complete_cycles(variables["RECHARGE_CONSTRAINT"]["I"])
+    return (drone.is_in_working_slot(time)
+            and not drone.has_exceeded_max_complete_cycles()
             and drone.battery.status == BatteryStatus.IN_USE
             and not drone.is_queue_full())
 
@@ -185,6 +188,8 @@ def evt_arrival(time, FES: PriorityQueue):
     data.time = time
     # measurements
     measurements.add_measurement(measurement=data)
+    # TODO: if steady_state:
+    #           measurements.add_measurement(measurement=data)
 
 
 def evt_departure(time, FES, drone_id, server_id):
@@ -226,41 +231,104 @@ def evt_departure(time, FES, drone_id, server_id):
     measurements.add_measurement(measurement=data)
 
 
-def calculate_warmup_period(measurements, window_size=10, threshold=0.0001, stable_period=50):
+def clear_folder(folder_path):
+    # Loop through all the files and directories inside the folder
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)  # Delete the file
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)  # Delete the directory and its contents
+        except Exception as e:
+            print(f'Failed to delete {file_path}. Reason: {e}')
+
+
+def calculate_warmup_period(buffer_size, measurements: Measurements, gap_threshold=100):
     """
-    Calcola il warm-up period in modo dinamico utilizzando una media mobile e una soglia di variazione.
-    Parametri:
-        - measurements: oggetto Measurements che contiene i dati della simulazione.
-        - window_size: dimensione della finestra per la media mobile.
-        - threshold: soglia di variazione relativa per determinare quando il sistema è stabile.
-        - stable_period: numero di campioni consecutivi che devono essere stabili per considerare concluso il warm-up.
-    Restituisce:
-        - Il tempo in cui il warm-up period termina (in secondi).
+    Calculates the warmup period for each working slot, where users != 0,
+    and saves a JSON file containing the working slots in steady state.
+
+    :param buffer_size: The buffer size to determine when the system reaches steady-state.
+    :param measurements: The measurements object containing user counts over time.
+    :param gap_threshold: The maximum allowed gap (in time units) to merge consecutive working slots.
+    :return: List of transition points from transient to steady-state for each slot.
     """
-    # Estrai i dati di average delay e tempo
-    lot = list(map(lambda m: (m.average_delay, m.time), measurements.history))
-    average_delay, time = list(zip(*lot))
+    # Extract the times and the number of users from the measurement history
+    lot = list(map(lambda m: (m.time, m.users), measurements.history))
+    times, users = list(zip(*lot))
 
-    # Calcola la media mobile sul average delay
-    moving_avg = np.convolve(average_delay, np.ones(window_size) / window_size, mode='valid')
+    # List to store the transition points from transient to steady-state for each time slot
+    warmup_times = []
 
-    stable_count = 0  # Conta il numero di campioni stabili consecutivi
+    # Detect working slots where users != 0
+    time_slots = []
+    steady_state_slots = []  # To store the steady state working slots
+    in_slot = False
+    start_time = None
+    last_nonzero_time = None
 
-    # Identifica il warm-up period analizzando la variazione relativa tra medie mobili successive
-    for i in range(1, len(moving_avg)):
-        variation = abs((moving_avg[i] - moving_avg[i - 1]) / moving_avg[i - 1])
+    for time, user_count in zip(times, users):
+        if user_count != 0:
+            if not in_slot:
+                # Start a new slot if we weren't already in one
+                start_time = time
+                in_slot = True
+            last_nonzero_time = time
+        elif in_slot and (time - last_nonzero_time > gap_threshold):
+            # End the current slot if users have been zero for longer than the gap threshold
+            end_time = last_nonzero_time
+            time_slots.append([start_time, end_time])
+            in_slot = False
 
-        # Se la variazione è minore della soglia, aumentiamo il contatore
-        if variation < threshold:
-            stable_count += 1
+    # If the last time slot is still open, close it at the last non-zero user time
+    if in_slot:
+        time_slots.append([start_time, last_nonzero_time])
+
+    # For each time slot, find when the number of users reaches the buffer size
+    for slot in time_slots:
+        start_time, end_time = slot
+        transient_period = None
+        max_users = 0
+        max_users_time = start_time  # Keep track of the time when max users occur in the slot
+
+        # Loop through the measurements within the time slot
+        for time, user_count in zip(times, users):
+            if start_time <= time <= end_time:
+                # Track the time when the maximum users occurred
+                if user_count > max_users:
+                    max_users = user_count
+                    max_users_time = time
+
+                # If users reach the buffer size, mark this time as the transient period end
+                if user_count >= buffer_size:
+                    transient_period = time
+                    break  # Once buffer size is reached, we exit the loop
+
+        # If we found a transient period, we assume the rest of the time is steady-state
+        if transient_period:
+            warmup_times.append(transient_period)
+            # Add the steady state working slot (from warmup time to end of time slot)
+            steady_state_slots.append([transient_period, end_time])
         else:
-            stable_count = 0  # Reset del contatore se c'è troppa variazione
+            # If buffer size is not reached, use the time when the maximum users occurred
+            warmup_times.append(max_users_time)
+            steady_state_slots.append([max_users_time, end_time])
 
-        # Se abbiamo un numero sufficiente di campioni stabili, consideriamo il warm-up period finito
-        if stable_count >= stable_period:
-            warmup_period_index = i + window_size - stable_period  # Aggiusta per l'indicizzazione e il periodo stabile
-            warmup_period_time = time[warmup_period_index]  # Ottieni il tempo corrispondente
-            return warmup_period_time
+    # Save the steady-state slots to a JSON file
+    steady_state_json_path = "./report_images/steady_state_working_slots.json"
+    with open(steady_state_json_path, 'w') as json_file:
+        json.dump(steady_state_slots, json_file, indent=4)
 
-    # Se non troviamo un punto di stabilità, restituisci il tempo massimo (fine dei dati)
-    return time[-1]
+    # Return the list of all warmup times (transition points from transient to steady-state)
+    return warmup_times
+
+
+def check_json_file_exists(json_filepath="./report_images/steady_state_working_slots.json"):
+    """
+    Checks whether the specified JSON file exists.
+
+    :param json_filepath: Path to the JSON file to check.
+    :return: True if the file exists, False otherwise.
+    """
+    return os.path.exists(json_filepath)
