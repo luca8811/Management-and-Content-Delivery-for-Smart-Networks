@@ -1,5 +1,6 @@
 import copy
 
+
 class Measurement:
     """
     Represents a collection of different measurements (such as arrivals, departures, etc..) taken
@@ -67,38 +68,45 @@ class FilteredMeasurements(Measurements):
         self.original_measurements = original_measurements
         self.steady_state_intervals = steady_state_intervals
 
-        # Filter the measurements
+        # Filter the measurements based on steady state and activity
         self.filter_measurements_by_steady_state()
+
+        # Compute cumulative metrics over the steady-state period
+        self.compute_cumulative_metrics()
 
     def filter_measurements_by_steady_state(self):
         """
         Filters the measurements in the history attribute to include only those
         that occur during the drone's steady-state periods.
         When the drone is inactive or not in steady-state, the last valid measurement is used.
-        Specific attributes (arrivals, drones, losses) remain unfiltered.
+        System-wide metrics (arrivals, drones, losses, etc.) remain unfiltered.
         """
         filtered_history = []
         last_valid_measurement = None
 
-        # Attributes that should not be filtered because independent of warm-up period.
-        non_filtered_attributes = ['time', 'arrivals', 'departures', 'losses', 'transmitted_packets', 'busy_time']
+        # System-wide attributes that should not be filtered (remain the same regardless of the drone's state)
+        non_filtered_attributes = ['arrivals', 'departures', 'losses', 'transmitted_packets', 'busy_time',
+                                   'drones', 'charging_drones']
 
         # Loop through all the measurements and filter based on the steady-state intervals and drone activity
         for measurement in self.original_measurements.history:
-            if any(start <= measurement.time <= end for start, end in
-                   self.steady_state_intervals) and measurement.drones > 0:
-                # If in steady-state and the drone is active, use the current measurement
+            # If the measurement is within a steady-state period and the drone is active
+            if any(start <= measurement.time <= end for start, end in self.steady_state_intervals) and measurement.drones > 0:
+                # Append the current measurement since the drone is active in steady state
                 filtered_history.append(measurement)
-                last_valid_measurement = measurement  # Update the last valid measurement
+                last_valid_measurement = measurement  # Update the last valid measurement for future use
             else:
-                # If not in steady-state or the drone is inactive, repeat the last valid measurement
+                # If the drone is inactive or not in steady state, use the last valid measurement
                 if last_valid_measurement:
-                    # Create a copy of the last valid measurement but update the time
-                    new_measurement = self.copy_measurement(last_valid_measurement, new_time=measurement.time)
+                    # Create a copy of the last valid measurement but retain the original time
+                    new_measurement = self.copy_measurement(last_valid_measurement)
 
-                    # Ensure that certain attributes remain the same as in the original measurement
+                    # Ensure that system-wide attributes remain the same as the original measurement
                     for attr in non_filtered_attributes:
                         setattr(new_measurement, attr, getattr(measurement, attr))
+
+                    # Keep the original time from the current measurement
+                    new_measurement.time = measurement.time
 
                     # Add the copied measurement with updated attributes
                     filtered_history.append(new_measurement)
@@ -107,20 +115,71 @@ class FilteredMeasurements(Measurements):
         self.history = filtered_history
 
     @staticmethod
-    def copy_measurement(measurement, new_time):
+    def copy_measurement(measurement):
         """
-        Creates a copy of a measurement, updating its time to new_time.
+        Creates a copy of a measurement, without modifying the time.
 
         Args:
             measurement: The measurement to copy.
-            new_time: The new time for the copied measurement.
 
         Returns:
-            A new Measurement object with updated time.
+            A new Measurement object with the same attributes (except time, which is handled separately).
         """
         new_measurement = Measurement()
         # Copy all attributes from the existing measurement
         new_measurement.__dict__.update(measurement.__dict__)
-        # Update the time to the new time
-        new_measurement.time = new_time
         return new_measurement
+
+    def compute_cumulative_metrics(self):
+        # todo: non so come gesite losses, departures e delay. Il resto è ok.
+        """
+        Compute cumulative metrics such as total arrivals, departures, users, losses, and delays
+        during the steady-state period. These are stored as attributes for easy access.
+        """
+        # Initialize attributes to store cumulative metrics
+        self.total_users = 0
+        self.total_arrivals = 0
+        self.total_departures = 0
+        self.total_losses = 0
+        self.total_delay = 0
+        self.steady_state_time = 0
+        self.users = 0
+
+        # Loop through the filtered measurements and accumulate metrics
+        previous_time = None
+
+        for i, measurement in enumerate(self.history):
+            # Only accumulate time for actual steady-state periods
+            if previous_time is not None:
+                time_diff = measurement.time - previous_time
+                self.steady_state_time += time_diff
+
+            # Set cumulative metrics as the final values for the last measurement
+            if i == len(self.history) - 1:
+                self.users = measurement.users  # Take the last measurement for users
+                self.total_arrivals = measurement.arrivals  # Take the last cumulative value for arrivals
+                self.total_departures = measurement.departures  # Last cumulative value for departures
+                self.total_losses = measurement.losses  # Last cumulative value for losses
+                self.total_delay += measurement.delay
+
+            self.total_users += measurement.users
+            # self.total_arrivals += measurement.arrivals
+            # self.total_departures += measurement.departures
+            # self.total_losses += measurement.losses
+            # self.total_delay += measurement.delay
+
+            # Update the previous time
+            previous_time = measurement.time
+
+        # Calculate average values or rates based on the steady-state data
+        if self.steady_state_time > 0:
+            self.steady_state_arrival_rate = self.total_arrivals / self.steady_state_time
+            self.steady_state_departure_rate = self.total_departures / self.steady_state_time
+            self.steady_state_loss_rate = self.total_losses / self.steady_state_time
+        else:
+            self.steady_state_arrival_rate = 0
+            self.steady_state_departure_rate = 0
+            self.steady_state_loss_rate = 0
+
+        self.average_users = self.total_users / len(self.history) if len(self.history) > 0 else 0
+        self.average_delay = self.total_delay / self.total_departures if self.total_departures > 0 else 0

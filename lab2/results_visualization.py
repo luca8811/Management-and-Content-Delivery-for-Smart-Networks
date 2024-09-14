@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import json
 from utils.measurements import Measurements
+import pandas as pd
 
 STARTING_TIME = 0
 
@@ -244,3 +245,54 @@ def plot_average_users_over_time_logarithmic(measurements: Measurements):
     output_filename = "./report_images/average_users_over_time_logarithmic_scale.png"
     plt.savefig(output_filename)
     plt.close()
+
+
+def compare_metrics(data, filtered_measurements):
+    """
+    Compare overall and steady-state metrics in a tabular format and plot the results.
+
+    Args:
+        data: The overall measurements.
+        filtered_measurements: The filtered measurements for steady-state data.
+
+    Returns:
+        A DataFrame containing the comparison of overall and steady-state metrics.
+    """
+    # Prepare data for comparison
+    comparison_data = {
+        'Metric': [
+            'Users in Queue', 'Total Arrivals', 'Total Departures', 'Total Losses',
+            'Arrival Rate', 'Departure Rate', 'Loss Rate', 'Departures-Losses Ratio',
+            'Departures Percentage', 'Average Users', 'Average Delay'
+        ],
+        'Overall': [
+            data.users, data.arrivals, data.departures, data.losses,
+            data.arrivals / data.time, data.departures / data.time, data.losses / data.time,
+            data.departures / data.losses if data.losses > 0 else "N/A",
+            data.departures / data.arrivals * 100 if data.arrivals > 0 else "N/A",
+            data.average_users / data.time, data.delay / data.departures if data.departures > 0 else "N/A"
+        ],
+        'Steady-State': [
+            filtered_measurements.users, filtered_measurements.total_arrivals,
+            filtered_measurements.total_departures, filtered_measurements.total_losses,
+            filtered_measurements.steady_state_arrival_rate, filtered_measurements.steady_state_departure_rate,
+            filtered_measurements.steady_state_loss_rate,
+            filtered_measurements.total_departures / filtered_measurements.total_losses if filtered_measurements.total_losses > 0 else "N/A",
+            filtered_measurements.total_departures / filtered_measurements.total_arrivals * 100 if filtered_measurements.total_arrivals > 0 else "N/A",
+            filtered_measurements.average_users, filtered_measurements.average_delay
+        ]
+    }
+
+    # Create a DataFrame to organize the data
+    df_comparison = pd.DataFrame(comparison_data)
+
+    # Plot comparison table using pandas
+    fig, ax = plt.subplots(figsize=(10, 5))  # Adjust the size of the figure
+    ax.axis('tight')
+    ax.axis('off')
+    table = ax.table(cellText=df_comparison.values, colLabels=df_comparison.columns, cellLoc='center', loc='center')
+    output_filename = "./report_images/steady_state_vs_overall_simulation.png"
+    plt.savefig(output_filename)
+    plt.close()
+
+    return df_comparison
