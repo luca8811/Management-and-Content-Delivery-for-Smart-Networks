@@ -1,0 +1,146 @@
+{
+    "WORKING_SCHEDULING_I_RECHARGE_CONSTRAINT_I": {
+        "departure_rate": 0.7438888888888889,
+        "arrivals": 173436,
+        "departures": 5356,
+        "losses": 168080
+    },
+    "WORKING_SCHEDULING_I_RECHARGE_CONSTRAINT_II": {
+        "departure_rate": 0.7438888888888889,
+        "arrivals": 346820,
+        "departures": 5356,
+        "losses": 341464
+    },
+    "WORKING_SCHEDULING_I_RECHARGE_CONSTRAINT_III": {
+        "departure_rate": 0.7438888888888889,
+        "arrivals": 520204,
+        "departures": 5356,
+        "losses": 514848
+    },
+    "WORKING_SCHEDULING_I_RECHARGE_CONSTRAINT_IV": {
+        "departure_rate": 0.7438888888888889,
+        "arrivals": 693588,
+        "departures": 5356,
+        "losses": 688232
+    },
+    "WORKING_SCHEDULING_I_RECHARGE_CONSTRAINT_V": {
+        "departure_rate": 0.7438888888888889,
+        "arrivals": 866972,
+        "departures": 5356,
+        "losses": 861616
+    },
+    "WORKING_SCHEDULING_I_RECHARGE_CONSTRAINT_VI": {
+        "departure_rate": 0.7438888888888889,
+        "arrivals": 1040356,
+        "departures": 5356,
+        "losses": 1035000
+    },
+    "WORKING_SCHEDULING_I_RECHARGE_CONSTRAINT_VII": {
+        "departure_rate": 1.0754166666666667,
+        "arrivals": 1213675,
+        "departures": 7743,
+        "losses": 1205932
+    },
+    "WORKING_SCHEDULING_I_RECHARGE_CONSTRAINT_VIII": {
+        "departure_rate": 1.4069444444444446,
+        "arrivals": 1386994,
+        "departures": 10130,
+        "losses": 1376864
+    },
+    "WORKING_SCHEDULING_II_RECHARGE_CONSTRAINT_I": {
+        "departure_rate": 0.8077083333333334,
+        "arrivals": 1560027,
+        "departures": 34893,
+        "losses": 1525132
+    },
+    "WORKING_SCHEDULING_II_RECHARGE_CONSTRAINT_II": {
+        "departure_rate": 0.8077083333333334,
+        "arrivals": 1733411,
+        "departures": 34893,
+        "losses": 1698516
+    },
+    "WORKING_SCHEDULING_II_RECHARGE_CONSTRAINT_III": {
+        "departure_rate": 0.8077083333333334,
+        "arrivals": 1906795,
+        "departures": 34893,
+        "losses": 1871900
+    },
+    "WORKING_SCHEDULING_II_RECHARGE_CONSTRAINT_IV": {
+        "departure_rate": 0.8077083333333334,
+        "arrivals": 2080179,
+        "departures": 34893,
+        "losses": 2045284
+    },
+    "WORKING_SCHEDULING_II_RECHARGE_CONSTRAINT_V": {
+        "departure_rate": 0.8077083333333334,
+        "arrivals": 2253563,
+        "departures": 34893,
+        "losses": 2218668
+    },
+    "WORKING_SCHEDULING_II_RECHARGE_CONSTRAINT_VI": {
+        "departure_rate": 0.877962962962963,
+        "arrivals": 2427020,
+        "departures": 37928,
+        "losses": 2389090
+    },
+    "WORKING_SCHEDULING_II_RECHARGE_CONSTRAINT_VII": {
+        "departure_rate": 1.0179166666666666,
+        "arrivals": 2600533,
+        "departures": 43974,
+        "losses": 2556557
+    },
+    "WORKING_SCHEDULING_II_RECHARGE_CONSTRAINT_VIII": {
+        "departure_rate": 1.2248379629629629,
+        "arrivals": 2774025,
+        "departures": 52913,
+        "losses": 2721110
+    },
+    "WORKING_SCHEDULING_III_RECHARGE_CONSTRAINT_I": {
+        "departure_rate": 2.89508547008547,
+        "arrivals": 2947311,
+        "departures": 67745,
+        "losses": 2879564
+    },
+    "WORKING_SCHEDULING_III_RECHARGE_CONSTRAINT_II": {
+        "departure_rate": 2.89508547008547,
+        "arrivals": 3120695,
+        "departures": 67745,
+        "losses": 3052948
+    },
+    "WORKING_SCHEDULING_III_RECHARGE_CONSTRAINT_III": {
+        "departure_rate": 2.89508547008547,
+        "arrivals": 3294079,
+        "departures": 67745,
+        "losses": 3226332
+    },
+    "WORKING_SCHEDULING_III_RECHARGE_CONSTRAINT_IV": {
+        "departure_rate": 2.89508547008547,
+        "arrivals": 3467463,
+        "departures": 67745,
+        "losses": 3399716
+    },
+    "WORKING_SCHEDULING_III_RECHARGE_CONSTRAINT_V": {
+        "departure_rate": 2.89508547008547,
+        "arrivals": 3640847,
+        "departures": 67745,
+        "losses": 3573100
+    },
+    "WORKING_SCHEDULING_III_RECHARGE_CONSTRAINT_VI": {
+        "departure_rate": 3.0247863247863247,
+        "arrivals": 3814304,
+        "departures": 70780,
+        "losses": 3743522
+    },
+    "WORKING_SCHEDULING_III_RECHARGE_CONSTRAINT_VII": {
+        "departure_rate": 3.2831623931623932,
+        "arrivals": 3987817,
+        "departures": 76826,
+        "losses": 3910989
+    },
+    "WORKING_SCHEDULING_III_RECHARGE_CONSTRAINT_VIII": {
+        "departure_rate": 3.66517094017094,
+        "arrivals": 4161309,
+        "departures": 85765,
+        "losses": 4075542
+    }
+}

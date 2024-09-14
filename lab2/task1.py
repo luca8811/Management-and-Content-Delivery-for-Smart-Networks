@@ -78,6 +78,7 @@ if __name__ == '__main__':
     # Generate various visualizations using the measurements and filtered steady-state data
     # Plot number of users over time with warm-up and steady-state periods highlighted
     results_visualization.plot_users_with_warmup(measurements=measurements, warmup_times=warmup_period)
+    results_visualization.plot_users_with_steady_state(measurements=measurements)
 
     # Compare overall and steady-state metrics and generate a report for comparison
     results_visualization.compare_metrics(data, filtered_measurements)

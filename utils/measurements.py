@@ -131,7 +131,7 @@ class FilteredMeasurements(Measurements):
         return new_measurement
 
     def compute_cumulative_metrics(self):
-        # todo: non so come gesite losses, departures e delay. Il resto è ok.
+        # todo: non so come gestite losses, departures e delay. Il resto è ok.
         """
         Compute cumulative metrics such as total arrivals, departures, users, losses, and delays
         during the steady-state period. These are stored as attributes for easy access.

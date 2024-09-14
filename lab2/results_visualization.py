@@ -1,7 +1,10 @@
+import time
+
 import matplotlib.pyplot as plt
 import json
 from utils.measurements import Measurements
 import pandas as pd
+from datetime import datetime
 
 STARTING_TIME = 0
 
@@ -15,7 +18,10 @@ def plot_users(measurements: Measurements):
     plt.ylabel('number of users')
     plt.grid()
     plt.title('Users over time')
-    plt.show()
+    t = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    output_filename = f"./report_images/users_over_time_{t}.png"
+    plt.savefig(output_filename)
+    plt.close()
 
 
 def plot_users_with_warmup(measurements: Measurements, warmup_times):
