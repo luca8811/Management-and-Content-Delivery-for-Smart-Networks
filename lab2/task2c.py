@@ -78,7 +78,7 @@ for scheduling_key in variables["WORKING_SCHEDULING"]:
         measurements, data = run_simulation(scheduling_key, battery_strategy)
 
 # Save the results to a JSON file
-with open("simulation_results.json", "w") as json_file:
+with open("simulation_results_task2.json", "w") as json_file:
     json.dump(results_dict, json_file, indent=4)
 
 print("Results saved to simulation_results.json")
