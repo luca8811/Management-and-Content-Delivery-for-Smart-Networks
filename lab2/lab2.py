@@ -185,12 +185,11 @@ def evt_arrival(time, FES: PriorityQueue):
 
     # cumulate statistics
     data.arrivals += 1
+    data.total_users += data.users
     data.average_users += data.users * (time - data.time)  # average users per time unit
     data.time = time
     # measurements
     measurements.add_measurement(measurement=data)
-    # TODO: if steady_state:
-    #           measurements.add_measurement(measurement=data)
 
 
 def evt_departure(time, FES, drone_id, server_id):
@@ -225,6 +224,7 @@ def evt_departure(time, FES, drone_id, server_id):
             FES.put((time + service_time, Event.DEPARTURE, drone_id, s_id))
 
     # cumulate statistics
+    data.total_users += data.users
     data.average_users += data.users * (time - data.time)
     data.time = time
     data.average_delay = data.delay / data.departures
@@ -333,3 +333,14 @@ def check_json_file_exists(json_filepath="./report_images/steady_state_working_s
     :return: True if the file exists, False otherwise.
     """
     return os.path.exists(json_filepath)
+
+
+def start_working_intervals(simulation_time):
+    start_times = []
+    working_interval = 25*60
+    charging_interval = 60*60
+    working_cycle = working_interval + charging_interval
+    working_slots = int(simulation_time / working_cycle)
+    for i in range(working_slots+1):
+        start_times.append(working_cycle * i)
+    return start_times

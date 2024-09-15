@@ -1,4 +1,5 @@
 import copy
+import matplotlib.pyplot as plt
 
 
 class Measurement:
@@ -17,6 +18,10 @@ class Measurement:
         self.charging_drones = 0
         self.average_users = 0  # Changed from 'ut'
         self.delay = 0
+        self.total_users = 0
+        self.working_interval = 25*60  # 25 minutes of work before recharging
+
+        # TODO: da controllare - non tutti sono utilizzati
         self.average_delay = 0
         self.average_losses = 0
         self.transmitted_packets = 0  # Number of transmitted packets
@@ -50,8 +55,8 @@ class Measurements:
         self.history.append(copy.deepcopy(measurement))
 
 
-class FilteredMeasurements(Measurements):
-    def __init__(self, original_measurements, steady_state_intervals):
+class FilteredMeasurements(Measurement, Measurements):
+    def __init__(self, original_measurements, steady_state_intervals, initial_time):
         """
         Initialize the FilteredMeasurements class, inheriting from Measurements.
         It filters measurements based on steady-state periods for drone operation.
@@ -67,26 +72,24 @@ class FilteredMeasurements(Measurements):
         # Store the original measurements and intervals
         self.original_measurements = original_measurements
         self.steady_state_intervals = steady_state_intervals
+        self.working_interval = self.steady_state_intervals[0][-1] - self.steady_state_intervals[0][0]
+        self.warmup_interval = self.steady_state_intervals[0][0] - initial_time
 
         # Filter the measurements based on steady state and activity
         self.filter_measurements_by_steady_state()
 
-        # Compute cumulative metrics over the steady-state period
-        self.compute_cumulative_metrics()
+        # Add cumulative attributes
+        self.warmup_cumulative_attributes()
+        self.cumulative_attributes()
 
     def filter_measurements_by_steady_state(self):
         """
         Filters the measurements in the history attribute to include only those
         that occur during the drone's steady-state periods.
-        When the drone is inactive or not in steady-state, the last valid measurement is used.
-        System-wide metrics (arrivals, drones, losses, etc.) remain unfiltered.
         """
         filtered_history = []
-        last_valid_measurement = None
-
-        # System-wide attributes that should not be filtered (remain the same regardless of the drone's state)
-        non_filtered_attributes = ['arrivals', 'departures', 'losses', 'transmitted_packets', 'busy_time',
-                                   'drones', 'charging_drones']
+        warmup_history = []
+        filtered_I_O = []
 
         # Loop through all the measurements and filter based on the steady-state intervals and drone activity
         for measurement in self.original_measurements.history:
@@ -94,92 +97,39 @@ class FilteredMeasurements(Measurements):
             if any(start <= measurement.time <= end for start, end in self.steady_state_intervals) and measurement.drones > 0:
                 # Append the current measurement since the drone is active in steady state
                 filtered_history.append(measurement)
-                last_valid_measurement = measurement  # Update the last valid measurement for future use
+                filtered_I_O.append(1)
             else:
-                # If the drone is inactive or not in steady state, use the last valid measurement
-                if last_valid_measurement:
-                    # Create a copy of the last valid measurement but retain the original time
-                    new_measurement = self.copy_measurement(last_valid_measurement)
-
-                    # Ensure that system-wide attributes remain the same as the original measurement
-                    for attr in non_filtered_attributes:
-                        setattr(new_measurement, attr, getattr(measurement, attr))
-
-                    # Keep the original time from the current measurement
-                    new_measurement.time = measurement.time
-
-                    # Add the copied measurement with updated attributes
-                    filtered_history.append(new_measurement)
+                filtered_I_O.append(0)
+                warmup_history.append(measurement)
 
         # Replace the history with the filtered measurements
         self.history = filtered_history
+        self.warmup_history = warmup_history[:-1]
+        self.check_filter = filtered_I_O
+        # self.check_filter_plot()
 
-    @staticmethod
-    def copy_measurement(measurement):
-        """
-        Creates a copy of a measurement, without modifying the time.
+    def warmup_cumulative_attributes(self):
+        self.warmup_arrivals = self.warmup_history[-1].arrivals
+        self.warmup_departures = self.warmup_history[-1].departures
+        self.warmup_losses = self.warmup_history[-1].losses
+        self.warmup_delays = self.warmup_history[-1].delay
+        self.warmup_total_users = sum(measurement.users for measurement in self.warmup_history)
 
-        Args:
-            measurement: The measurement to copy.
+    def cumulative_attributes(self):
+        self.arrivals = self.history[-1].arrivals - self.warmup_arrivals
+        self.departures = self.history[-1].departures - self.warmup_departures
+        self.losses = self.history[-1].losses - self.warmup_losses
+        self.users = self.history[-1].users
+        self.drones = self.history[-1].drones
+        self.charging_drones = self.history[-1].charging_drones
+        self.delay = self.history[-1].delay - self.warmup_delays
+        self.total_users = sum(measurement.users for measurement in self.history)
 
-        Returns:
-            A new Measurement object with the same attributes (except time, which is handled separately).
-        """
-        new_measurement = Measurement()
-        # Copy all attributes from the existing measurement
-        new_measurement.__dict__.update(measurement.__dict__)
-        return new_measurement
-
-    def compute_cumulative_metrics(self):
-        # todo: non so come gestite losses, departures e delay. Il resto è ok.
-        """
-        Compute cumulative metrics such as total arrivals, departures, users, losses, and delays
-        during the steady-state period. These are stored as attributes for easy access.
-        """
-        # Initialize attributes to store cumulative metrics
-        self.total_users = 0
-        self.total_arrivals = 0
-        self.total_departures = 0
-        self.total_losses = 0
-        self.total_delay = 0
-        self.steady_state_time = 0
-        self.users = 0
-
-        # Loop through the filtered measurements and accumulate metrics
-        previous_time = None
-
-        for i, measurement in enumerate(self.history):
-            # Only accumulate time for actual steady-state periods
-            if previous_time is not None:
-                time_diff = measurement.time - previous_time
-                self.steady_state_time += time_diff
-
-            # Set cumulative metrics as the final values for the last measurement
-            if i == len(self.history) - 1:
-                self.users = measurement.users  # Take the last measurement for users
-                self.total_arrivals = measurement.arrivals  # Take the last cumulative value for arrivals
-                self.total_departures = measurement.departures  # Last cumulative value for departures
-                self.total_losses = measurement.losses  # Last cumulative value for losses
-                self.total_delay += measurement.delay
-
-            self.total_users += measurement.users
-            # self.total_arrivals += measurement.arrivals
-            # self.total_departures += measurement.departures
-            # self.total_losses += measurement.losses
-            # self.total_delay += measurement.delay
-
-            # Update the previous time
-            previous_time = measurement.time
-
-        # Calculate average values or rates based on the steady-state data
-        if self.steady_state_time > 0:
-            self.steady_state_arrival_rate = self.total_arrivals / self.steady_state_time
-            self.steady_state_departure_rate = self.total_departures / self.steady_state_time
-            self.steady_state_loss_rate = self.total_losses / self.steady_state_time
-        else:
-            self.steady_state_arrival_rate = 0
-            self.steady_state_departure_rate = 0
-            self.steady_state_loss_rate = 0
-
-        self.average_users = self.total_users / len(self.history) if len(self.history) > 0 else 0
-        self.average_delay = self.total_delay / self.total_departures if self.total_departures > 0 else 0
+    def check_filter_plot(self):
+        plt.figure(figsize=(10, 5))
+        plt.plot(self.check_filter, marker='o', linestyle='-', color='b')
+        plt.xlabel('Index')
+        plt.ylabel('Value')
+        plt.title('Line Plot of Binary List')
+        plt.grid(True)
+        plt.show()

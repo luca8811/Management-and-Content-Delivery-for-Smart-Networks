@@ -3,7 +3,7 @@ from queue import PriorityQueue
 import lab2
 import results_visualization
 from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, calculate_warmup_period, clear_folder,
-                  FilteredMeasurements)
+                  start_working_intervals, FilteredMeasurements)
 from utils.queues import MMmB
 import json
 
@@ -16,6 +16,7 @@ variables = lab2.variables  # All configurations and settings are now stored in 
 MMms = lab2.MMms  # List of MMmB objects representing different drone types
 measurements = lab2.measurements  # To store measurement data (arrivals, departures, losses, etc.)
 data = lab2.data  # Overall data to store aggregated measurements over the simulation time
+starting_times = start_working_intervals(variables["SIM_TIME"])
 
 # Initialize different drone types based on the configuration 'I'
 drone_types = variables['drone_types']
@@ -27,11 +28,14 @@ for i, drone_type in enumerate(variables['configurations']['I']):
         service_times=[1 / (variables['BASE_SERVICE_RATE'] * drone['SERVICE_RATE']) for m in range(drone['m_ANTENNAS'])],
         buffer_size=variables['BASE_BUFFER_SIZE'] * drone['BUFFER_SIZE'],  # Buffer size is multiplied by drone's factor
         maximum_recharge_cycles=variables["RECHARGE_CONSTRAINT"]["I"],  # Max number of recharge cycles for the drone
-        working_slots=variables["WORKING_SCHEDULING"]["IV"]  # Time intervals when the drone is operational
+        working_slots=variables["WORKING_SCHEDULING"]["V"]  # Time intervals when the drone is operational
     )
 
 # Main simulation logic
 if __name__ == '__main__':
+
+    initial_time = starting_times[0]
+
     random.seed(42)  # Set a seed for reproducibility of random events in the simulation
 
     # Initialize simulation time
@@ -73,7 +77,7 @@ if __name__ == '__main__':
         steady_state_intervals = json.load(json_file)
 
     # Filter measurements to only include data during steady-state periods
-    filtered_measurements = FilteredMeasurements(measurements, steady_state_intervals)
+    filtered_measurements = FilteredMeasurements(measurements, steady_state_intervals, initial_time)
 
     # Generate various visualizations using the measurements and filtered steady-state data
     # Plot number of users over time with warm-up and steady-state periods highlighted
