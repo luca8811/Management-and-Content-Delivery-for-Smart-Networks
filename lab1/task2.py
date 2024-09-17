@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 logging.basicConfig(level=logging.WARNING)
 
 # Costanti
-SERVICE = 20.0  # Tempo medio di servizio fisso
-arrival_rates = [5, 10, 15, 20]  # Tassi di arrivo
-buffer_sizes = [float('inf'), 100, 300, 500]  # Buffer infinito e buffer di dimensioni finite
-SIM_TIME = 500000
+SERVICE = 2.0  # Tempo medio di servizio fisso
+arrival_rates = [0.5, 0.8, 1.0, 1.2]  # Tassi di arrivo
+buffer_sizes = [float('inf'), 10, 20, 50]  # Buffer infinito e buffer di dimensioni finite
+SIM_TIME = 100000
 
 # Configurazione degli scenari
 scenarios = {
@@ -31,66 +31,73 @@ results_data = {
     'busy_time_ratio': []
 }
 
-# Funzione per risolvere quale MMm usare (scelta casuale tra i server)
-def resolve_MMm():
-    return random.choice(list(MMms.keys()))
-
 # Evento di arrivo
-def arrival(time, FES, queue_id, data, ARRIVAL):
-    global users
+def arrival(time, FES, queue_id, data, ARRIVAL, n_drones):
     queue = MMms[queue_id]
-    loss = queue.is_queue_full()
-    data.arrivals += 1
+    measurement = data[queue_id]
+    packet = Packet(time)
+    measurement.arrivals += 1
 
-    if loss:
-        data.losses += 1
+    if queue.is_queue_full():
+        measurement.losses += 1
     else:
-        if users > 0:
-            data.average_users += users * (time - data.time)
-        data.time = time
-        packet = Packet(time)
-        queue.insert(packet)
-        users += 1
-        data.transmitted_packets += 1
-        data.average_packets += users
-
+        queue.users += 1  # Incrementa gli utenti poiché un nuovo pacchetto è arrivato
         if queue.can_engage_server():
             (s_id, s_service_time) = queue.engage_server()
+            queue.server_packets[s_id] = packet  # Assegna il pacchetto al server
+            packet.start_service_time = time  # Imposta il tempo di inizio servizio
             service_time = random.expovariate(1.0 / SERVICE)
             FES.put((time + service_time, "departure", queue_id, s_id))
-            data.busy_time += service_time
+            measurement.busy_time += service_time
+        else:
+            queue.insert(packet)
 
-    inter_arrival = random.expovariate(1.0 / ARRIVAL)
-    FES.put((time + inter_arrival, "arrival", resolve_MMm(), None))
+    # Pianifica il prossimo arrivo
+    inter_arrival = random.expovariate(ARRIVAL / n_drones)
+    FES.put((time + inter_arrival, "arrival", queue_id, None))
+
 
 # Evento di partenza
 def departure(time, FES, queue_id, server_id, data):
-    global users
     queue = MMms[queue_id]
-    if queue.queue_size() > 0:
-        packet = queue.consume(server_id)
-        data.departures += 1
-        service_duration = time - packet.arrival_time
-        data.delay += service_duration
+    measurement = data[queue_id]
+    packet = queue.server_packets.pop(server_id)  # Recupera il pacchetto associato al server
+    measurement.departures += 1
 
-        if packet.start_service_time is not None:
-            queue_delay = packet.start_service_time - packet.arrival_time
-            data.queue_delay += queue_delay
+    total_delay = time - packet.arrival_time  # Ritardo totale nel sistema
+    measurement.delay += total_delay
 
-        data.waiting_delay += service_duration
+    if packet.start_service_time is not None:
+        queue_delay = packet.start_service_time - packet.arrival_time  # Tempo in coda
+        service_time = time - packet.start_service_time  # Tempo di servizio
+        measurement.queue_delay += queue_delay
+        measurement.waiting_delay += service_time  # Aggiorna il tempo di servizio
+    else:
+        # Questo non dovrebbe accadere, ma lo gestiamo comunque
+        measurement.waiting_delay += 0
 
-        if users > 0:
-            data.average_users += users * (time - data.time)
-        data.time = time
-        users -= 1
+    # Aggiorna il numero medio di utenti
+    if queue.users > 0:
+        measurement.average_users += queue.users * (time - measurement.time)
+    measurement.time = time
+    queue.users -= 1  # Decrementa gli utenti poiché un pacchetto ha lasciato il sistema
 
-        if queue.can_engage_server():
-            (s_id, s_service_time) = queue.engage_server()
-            service_time = random.expovariate(1.0 / SERVICE)
-            FES.put((time + service_time, "departure", queue_id, s_id))
-            data.busy_time += service_time
+    # Controlla se ci sono pacchetti in attesa nella coda
+    if len(queue._queue) > 0:
+        next_packet = queue._queue.pop(0)  # Estrae il prossimo pacchetto dalla coda
+        queue.server_packets[server_id] = next_packet  # Assegna il pacchetto al server
+        next_packet.start_service_time = time  # Imposta il tempo di inizio servizio
+        next_service_time = random.expovariate(1.0 / SERVICE)
+        FES.put((time + next_service_time, "departure", queue_id, server_id))
+        measurement.busy_time += next_service_time
+        # Non decrementare queue.users qui, il pacchetto è ancora nel sistema
+    else:
+        # Non ci sono pacchetti in attesa, il server diventa idle
+        queue._servers[server_id].idle = True
 
-    data.buffer_occupancy += users
+    measurement.buffer_occupancy += queue.users
+
+
 
 if __name__ == '__main__':
     random.seed(42)
@@ -106,45 +113,61 @@ if __name__ == '__main__':
         for scenario_key, config in scenarios.items():
             n_drones = config['n_drones']
             antennas_per_drone = config['antennas_per_drone']
+            total_servers = n_drones * antennas_per_drone
 
             for BUFFER_SIZE in buffer_sizes:
                 for ARRIVAL in arrival_rates:
                     # Crea droni con il numero specificato di antenne
                     MMms = {i: MMmB(power_supply="INF", service_times=[SERVICE] * antennas_per_drone, buffer_size=BUFFER_SIZE) for i in range(n_drones)}
-                    data = Measurement()
+                    # Inizializza data per ogni coda
+                    data = {queue_id: Measurement() for queue_id in MMms.keys()}
+                    # Inizializza users e server_packets per ogni coda
+                    for queue in MMms.values():
+                        queue.users = 0
+                        queue.server_packets = {}  # Aggiungi questa linea
                     time = 0
                     FES = PriorityQueue()
-                    FES.put((0, "arrival", resolve_MMm(), None))
-                    users = 0
+                    # Inizializza un arrivo per ciascuna coda
+                    for queue_id in MMms.keys():
+                        FES.put((0, "arrival", queue_id, None))
 
                     while time < SIM_TIME:
                         (time, event_type, queue_id, server_id) = FES.get()
                         if event_type == "arrival":
-                            arrival(time, FES, queue_id, data, ARRIVAL)
+                            arrival(time, FES, queue_id, data, ARRIVAL, n_drones)
                         elif event_type == "departure":
                             departure(time, FES, queue_id, server_id, data)
 
-                    # Calcola le metriche di prestazione
-                    average_delay = data.delay / data.departures if data.departures > 0 else 0
-                    average_queue_delay = data.queue_delay / data.departures if data.departures > 0 else 0
-                    average_waiting_delay = data.waiting_delay / data.departures if data.departures > 0 else 0
-                    average_buffer_occupancy = data.buffer_occupancy / data.arrivals if data.arrivals > 0 else 0
-                    loss_probability = data.losses / data.arrivals if data.arrivals > 0 else 0
-                    average_users = data.average_users / time if time > 0 else 0
-                    busy_time_ratio = data.busy_time / SIM_TIME
+                    # Calcola le metriche di prestazione sommando sui droni
+                    total_arrivals = sum([data[queue_id].arrivals for queue_id in data.keys()])
+                    total_departures = sum([data[queue_id].departures for queue_id in data.keys()])
+                    total_losses = sum([data[queue_id].losses for queue_id in data.keys()])
+                    total_delay = sum([data[queue_id].delay for queue_id in data.keys()])
+                    total_queue_delay = sum([data[queue_id].queue_delay for queue_id in data.keys()])
+                    total_waiting_delay = sum([data[queue_id].waiting_delay for queue_id in data.keys()])
+                    total_buffer_occupancy = sum([data[queue_id].buffer_occupancy for queue_id in data.keys()])
+                    total_busy_time = sum([data[queue_id].busy_time for queue_id in data.keys()])
+                    total_average_users = sum([data[queue_id].average_users for queue_id in data.keys()]) / SIM_TIME
+
+                    average_delay = total_delay / total_departures if total_departures > 0 else 0
+                    average_queue_delay = total_queue_delay / total_departures if total_departures > 0 else 0
+                    average_waiting_delay = total_waiting_delay / total_departures if total_departures > 0 else 0
+                    average_buffer_occupancy = total_buffer_occupancy / total_arrivals if total_arrivals > 0 else 0
+                    loss_probability = total_losses / total_arrivals if total_arrivals > 0 else 0
+                    busy_time_ratio = total_busy_time / (SIM_TIME * total_servers)
 
                     # Scrivi i risultati nel file CSV
                     writer.writerow(
-                        [scenario_key, BUFFER_SIZE, ARRIVAL, users, data.arrivals, data.departures, data.losses / time,
-                         data.losses, average_users, average_delay, average_queue_delay, average_waiting_delay,
+                        [scenario_key, BUFFER_SIZE, ARRIVAL, "-", total_arrivals, total_departures, total_losses / time if time > 0 else 0,
+                         total_losses, total_average_users, average_delay, average_queue_delay, average_waiting_delay,
                          average_buffer_occupancy, loss_probability, busy_time_ratio])
 
                     # Stampa i risultati per monitorare la simulazione
                     print(f"Results for {scenario_key} - Buffer Size {BUFFER_SIZE} and Arrival Rate {ARRIVAL}:")
-                    print("No. of users in the queue:", users)
-                    print("No. of arrivals =", data.arrivals, "- No. of departures =", data.departures)
-                    print("Loss rate:", data.losses / time, "- Packets lost:", data.losses)
-                    print("Average number of users:", average_users)
+                    print("No. of users in the queue per drone:", [MMms[q_id].users for q_id in MMms.keys()])
+                    print("No. of arrivals =", total_arrivals, "- No. of departures =", total_departures)
+                    print("Loss rate:", total_losses / time if time > 0 else 0, "- Packets lost:", total_losses)
+                    print("Average number of users:", total_average_users)
                     print("Average delay:", average_delay)
                     print("Average queue delay:", average_queue_delay)
                     print("Average waiting delay:", average_waiting_delay)
@@ -158,72 +181,11 @@ if __name__ == '__main__':
                     results_data['buffer_size'].append(BUFFER_SIZE)
                     results_data['arrival_rate'].append(ARRIVAL)
                     results_data['average_delay'].append(average_delay)
-                    results_data['loss_rate'].append(data.losses / time if time > 0 else 0)
+                    results_data['loss_rate'].append(total_losses / time if time > 0 else 0)
                     results_data['buffer_occupancy'].append(average_buffer_occupancy)
                     results_data['busy_time_ratio'].append(busy_time_ratio)
 
-    # Grafico 1: Ritardo medio vs Tasso di arrivo (con scala logaritmica)
-    plt.figure(figsize=(8, 6))
-    for buffer_size in buffer_sizes:
-        for scenario in scenarios:
-            x = [results_data['arrival_rate'][i] for i in range(len(results_data['scenario']))
-                 if results_data['scenario'][i] == scenario and results_data['buffer_size'][i] == buffer_size]
-            y = [results_data['average_delay'][i] for i in range(len(results_data['scenario']))
-                 if results_data['scenario'][i] == scenario and results_data['buffer_size'][i] == buffer_size]
-            plt.plot(x, y, marker='o', label=f'{scenario}, Buffer={buffer_size}')
-    plt.yscale('log')  # Aggiunta della scala logaritmica
-    plt.title('Average Delay vs Arrival Rate')
-    plt.xlabel('Arrival Rate')
-    plt.ylabel('Average Delay (log scale)')
-    plt.legend(loc='upper right')
-    plt.grid(True)
-    plt.show()
 
-    # Grafico 2: Tasso di perdita vs Tasso di arrivo (normale)
-    plt.figure(figsize=(8, 6))
-    for buffer_size in buffer_sizes:
-        for scenario in scenarios:
-            x = [results_data['arrival_rate'][i] for i in range(len(results_data['scenario']))
-                 if results_data['scenario'][i] == scenario and results_data['buffer_size'][i] == buffer_size]
-            y = [results_data['loss_rate'][i] for i in range(len(results_data['scenario']))
-                 if results_data['scenario'][i] == scenario and results_data['buffer_size'][i] == buffer_size]
-            plt.plot(x, y, marker='o', label=f'{scenario}, Buffer={buffer_size}')
-    plt.title('Loss Rate vs Arrival Rate')
-    plt.xlabel('Arrival Rate')
-    plt.ylabel('Loss Rate')
-    plt.legend(loc='upper right')
-    plt.grid(True)
-    plt.show()
 
-    # Grafico 3: Occupazione del buffer vs Tasso di arrivo (con scala logaritmica)
-    plt.figure(figsize=(8, 6))
-    for buffer_size in buffer_sizes:
-        for scenario in scenarios:
-            x = [results_data['arrival_rate'][i] for i in range(len(results_data['scenario']))
-                 if results_data['scenario'][i] == scenario and results_data['buffer_size'][i] == buffer_size]
-            y = [results_data['buffer_occupancy'][i] for i in range(len(results_data['scenario']))
-                 if results_data['scenario'][i] == scenario and results_data['buffer_size'][i] == buffer_size]
-            plt.plot(x, y, marker='o', label=f'{scenario}, Buffer={buffer_size}')
-    plt.yscale('log')  # Aggiunta della scala logaritmica
-    plt.title('Buffer Occupancy vs Arrival Rate')
-    plt.xlabel('Arrival Rate')
-    plt.ylabel('Buffer Occupancy (log scale)')
-    plt.legend(loc='upper right')
-    plt.grid(True)
-    plt.show()
 
-    # Grafico 4: Busy Time Ratio vs Tasso di arrivo (normale)
-    plt.figure(figsize=(8, 6))
-    for buffer_size in buffer_sizes:
-        for scenario in scenarios:
-            x = [results_data['arrival_rate'][i] for i in range(len(results_data['scenario']))
-                 if results_data['scenario'][i] == scenario and results_data['buffer_size'][i] == buffer_size]
-            y = [results_data['busy_time_ratio'][i] for i in range(len(results_data['scenario']))
-                 if results_data['scenario'][i] == scenario and results_data['buffer_size'][i] == buffer_size]
-            plt.plot(x, y, marker='o', label=f'{scenario}, Buffer={buffer_size}')
-    plt.title('Busy Time Ratio vs Arrival Rate')
-    plt.xlabel('Arrival Rate')
-    plt.ylabel('Busy Time Ratio')
-    plt.legend(loc='upper right')
-    plt.grid(True)
-    plt.show()
+
