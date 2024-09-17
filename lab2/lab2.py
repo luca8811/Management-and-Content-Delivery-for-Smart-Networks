@@ -335,12 +335,80 @@ def check_json_file_exists(json_filepath="./report_images/steady_state_working_s
     return os.path.exists(json_filepath)
 
 
-def start_working_intervals(simulation_time):
+def start_working_intervals(simulation_time, working_schedule_lists):
+    start_slot = working_schedule_lists[0][0]
+    end_slot = working_schedule_lists[0][1]
     start_times = []
     working_interval = 25*60
     charging_interval = 60*60
     working_cycle = working_interval + charging_interval
     working_slots = int(simulation_time / working_cycle)
     for i in range(working_slots+1):
-        start_times.append(working_cycle * i)
+        initial_time = working_cycle * i
+        if start_slot <= initial_time <= end_slot:
+            start_times.append(initial_time)
+    # Saves the dictionary in a JSON file
+    output_file_path = "./report_images/start_working_intervals.json"
+    with open(output_file_path, 'w') as json_file:
+        json.dump(start_times, json_file, indent=4)
     return start_times
+
+
+def save_steady_state_metrics(filtered_measurements):
+    """
+    Compare overall and steady-state metrics in a dictionary format.
+
+    Args:
+        filtered_measurements: The filtered measurements for steady-state data.
+
+    Returns:
+        dict: A dictionary containing the steady-state metrics.
+    """
+
+    def round_if_number(value):
+        """Helper function to round a number to 3 decimal places, or return 'N/A'."""
+        if isinstance(value, (int, float)):
+            return round(value, 3)
+        return value
+
+    # Prepare the steady-state metrics in dictionary format
+    steady_state_metrics = {
+        'Working Time': round_if_number(filtered_measurements.steady_state_interval),
+        'Total Arrivals': round_if_number(filtered_measurements.arrivals),
+        'Total Departures': round_if_number(filtered_measurements.departures),
+        'Total Losses': round_if_number(filtered_measurements.losses),
+        'Arrival Rate': round_if_number(filtered_measurements.arrivals / filtered_measurements.steady_state_interval),
+        'Departure Rate': round_if_number(filtered_measurements.departures / filtered_measurements.steady_state_interval),
+        'Loss Rate': round_if_number(filtered_measurements.losses / filtered_measurements.steady_state_interval),
+        'Departures-Losses Ratio': round_if_number(
+            filtered_measurements.departures / filtered_measurements.losses
+        ) if filtered_measurements.losses > 0 else "N/A",
+        'Departures Percentage': round_if_number(
+            filtered_measurements.departures / filtered_measurements.arrivals * 100
+        ) if filtered_measurements.arrivals > 0 else "N/A",
+        'Average Users': round_if_number(filtered_measurements.total_users / filtered_measurements.steady_state_interval),
+        'Average Delay': round_if_number(
+            filtered_measurements.delay / filtered_measurements.departures
+        ) if filtered_measurements.departures > 0 else "N/A"
+    }
+
+    return steady_state_metrics
+
+
+def seconds_to_time_string(seconds):
+    """
+    Converts a given number of seconds from midnight into a time string in the format HH:MM:SS.
+
+    Args:
+        seconds (int): The number of seconds since midnight.
+
+    Returns:
+        str: The time string in the format HH:MM:SS.
+    """
+    hours = seconds // 3600  # Calculate the hours
+    minutes = (seconds % 3600) // 60  # Calculate minutes
+    seconds = seconds % 60  # Calculates seconds remaining
+
+    # Returns the formatted string in the format HH:MM:SS
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
+

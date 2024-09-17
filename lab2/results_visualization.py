@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import json
 from utils.measurements import Measurements
 import pandas as pd
+import re
 
 STARTING_TIME = 0
 
@@ -159,16 +160,17 @@ def plot_delay(measurements: Measurements):
     plt.show()
 
 
-def compare_metrics(data, filtered_measurements):
+def compare_metrics(data, filtered_measurements, title=None):
     """
     Compare overall and steady-state metrics in a tabular format and plot the results.
 
     Args:
         data: Original measurements.
         filtered_measurements: The filtered measurements for steady-state data.
+        title: Optional custom title for the plot. If None, no additional title is added.
 
     Returns:
-        A DataFrame containing the comparison of original and steady-state metrics.
+        A DataFrame containing the comparison of overall and steady-state metrics.
     """
 
     def round_if_number(value):
@@ -180,11 +182,12 @@ def compare_metrics(data, filtered_measurements):
     # Prepare data for comparison
     comparison_data = {
         'Metric': [
-            'Total Arrivals', 'Total Departures', 'Total Losses',
+            'Working Time', 'Total Arrivals', 'Total Departures', 'Total Losses',
             'Arrival Rate', 'Departure Rate', 'Loss Rate', 'Departures-Losses Ratio',
             'Departures Percentage', 'Average Users', 'Average Delay'
         ],
         "Warm-up transient": [
+            round_if_number(filtered_measurements.warmup_interval),
             round_if_number(filtered_measurements.warmup_arrivals),
             round_if_number(filtered_measurements.warmup_departures),
             round_if_number(filtered_measurements.warmup_losses),
@@ -203,24 +206,26 @@ def compare_metrics(data, filtered_measurements):
                 filtered_measurements.warmup_delays / filtered_measurements.warmup_departures) if filtered_measurements.warmup_departures > 0 else "N/A"
         ],
         'Steady-State': [
+            round_if_number(filtered_measurements.steady_state_interval),
             round_if_number(filtered_measurements.arrivals),
             round_if_number(filtered_measurements.departures),
             round_if_number(filtered_measurements.losses),
 
-            round_if_number(filtered_measurements.arrivals / filtered_measurements.working_interval),
-            round_if_number(filtered_measurements.departures / filtered_measurements.working_interval),
-            round_if_number(filtered_measurements.losses / filtered_measurements.working_interval),
+            round_if_number(filtered_measurements.arrivals / filtered_measurements.steady_state_interval),
+            round_if_number(filtered_measurements.departures / filtered_measurements.steady_state_interval),
+            round_if_number(filtered_measurements.losses / filtered_measurements.steady_state_interval),
 
             round_if_number(
                 filtered_measurements.departures / filtered_measurements.losses) if filtered_measurements.losses > 0 else "N/A",
             round_if_number(
                 filtered_measurements.departures / filtered_measurements.arrivals * 100) if filtered_measurements.arrivals > 0 else "N/A",
 
-            round_if_number(filtered_measurements.total_users / filtered_measurements.working_interval),
+            round_if_number(filtered_measurements.total_users / filtered_measurements.steady_state_interval),
             round_if_number(
                 filtered_measurements.delay / filtered_measurements.departures) if filtered_measurements.departures > 0 else "N/A"
         ],
         'Overall': [
+            round_if_number(data.working_interval),
             round_if_number(data.arrivals),
             round_if_number(data.departures),
             round_if_number(data.losses),
@@ -244,9 +249,38 @@ def compare_metrics(data, filtered_measurements):
     fig, ax = plt.subplots(figsize=(10, 5))  # Adjust the size of the figure
     ax.axis('tight')
     ax.axis('off')
+
+    # Create the table
     table = ax.table(cellText=df_comparison.values, colLabels=df_comparison.columns, cellLoc='center', loc='center')
-    output_filename = "./report_images/steady_state_vs_overall_simulation.png"
-    plt.savefig(output_filename)
+
+    # Format table: Adjust column width, font size, and borders
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.2, 1.2)  # Scale the table to fit better in the plot
+
+    # Set cell properties (add borders and change background color for headers)
+    for (i, j), cell in table.get_celld().items():
+        if i == 0:  # Header row
+            cell.set_fontsize(11)
+            cell.set_text_props(weight='bold')
+            cell.set_edgecolor('black')
+            cell.set_facecolor('#d9d9d9')  # Lighter grey background for the header
+        else:
+            cell.set_edgecolor('black')
+
+    # Add title if provided
+    base_title = "Comparison of Metrics: Warm-up, Steady-State, and Overall"
+    if title:
+        plt.title(f"{base_title}\n{title}", fontsize=14, fontweight='bold', pad=10)
+    else:
+        plt.title(base_title, fontsize=14, fontweight='bold', pad=10)
+
+    # Clean up the title for file naming (replace invalid characters like ':' with '_')
+    safe_title = re.sub(r'[\\/*?:"<>|]', '_', title or 'default')
+
+    # Save the plot
+    output_filename = f"./report_images/steady_state_vs_overall_simulation_{safe_title}.png"
+    plt.savefig(output_filename, bbox_inches='tight')
     plt.close()
 
     return df_comparison

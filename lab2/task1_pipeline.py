@@ -2,8 +2,8 @@ import random
 from queue import PriorityQueue
 import lab2
 import results_visualization
-from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, calculate_warmup_period, clear_folder,
-                  start_working_intervals, seconds_to_time_string, FilteredMeasurements)
+from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, calculate_warmup_period,
+                  clear_folder, seconds_to_time_string, start_working_intervals, save_steady_state_metrics, FilteredMeasurements)
 from utils.queues import MMmB
 import json
 
@@ -16,25 +16,27 @@ variables = lab2.variables  # All configurations and settings are now stored in 
 MMms = lab2.MMms  # List of MMmB objects representing different drone types
 measurements = lab2.measurements  # To store measurement data (arrivals, departures, losses, etc.)
 data = lab2.data  # Overall data to store aggregated measurements over the simulation time
-starting_times = start_working_intervals(variables["SIM_TIME"], variables["WORKING_SCHEDULING"]["IV"])
 
-# Initialize different drone types based on the configuration 'I'
-drone_types = variables['drone_types']
-for i, drone_type in enumerate(variables['configurations']['I']):
-    drone = drone_types[drone_type]  # Get drone specifications from configuration
-    # Initialize an MMmB object for each drone type with its properties like power, service rate, and buffer size
-    MMms[i] = MMmB(
+# Initialize a dictionary to store the departure rate results
+results_dict = {}
+
+start_working_times = start_working_intervals(variables["SIM_TIME"], variables["WORKING_SCHEDULING"]["V"])
+
+
+# Function to run the simulation for a given [da decidere] configuration
+def simulation_pipeline(slot_counter, start_working_time):
+    # Initialize different drone types based on the configuration 'I'
+    drone = variables["drone_types"]['A']  # Get drone specifications from configuration
+
+    # Initialize an MMmB object for each drone type with its properties like power,
+    # service rate, and buffer size
+    MMms[0] = MMmB(
         power_supply=drone['POW'],  # Power supply of the drone
-        service_times=[1 / (variables['BASE_SERVICE_RATE'] * drone['SERVICE_RATE']) for m in range(drone['m_ANTENNAS'])],
+        service_times=[1 / (variables['BASE_SERVICE_RATE'] * drone['SERVICE_RATE'])],
         buffer_size=variables['BASE_BUFFER_SIZE'] * drone['BUFFER_SIZE'],  # Buffer size is multiplied by drone's factor
         maximum_recharge_cycles=variables["RECHARGE_CONSTRAINT"]["I"],  # Max number of recharge cycles for the drone
         working_slots=variables["WORKING_SCHEDULING"]["IV"]  # Time intervals when the drone is operational
     )
-
-# Main simulation logic
-if __name__ == '__main__':
-
-    initial_time = starting_times[0]
 
     random.seed(42)  # Set a seed for reproducibility of random events in the simulation
 
@@ -74,15 +76,33 @@ if __name__ == '__main__':
     # Load the steady-state time intervals from the generated JSON file
     steady_state_json_filepath = "./report_images/steady_state_working_slots.json"
     with open(steady_state_json_filepath) as json_file:
-        steady_state_intervals = json.load(json_file)
+        steady_state_lists = json.load(json_file)
 
     # Filter measurements to only include data during steady-state periods
-    filtered_measurements = FilteredMeasurements(measurements, steady_state_intervals[0], initial_time)
+    filtered_measurements = FilteredMeasurements(measurements, steady_state_lists[slot_counter], start_working_time)
 
-    # Generate various visualizations using the measurements and filtered steady-state data
-    # Plot number of users over time with warm-up and steady-state periods highlighted
-    results_visualization.plot_users_with_warmup(measurements=measurements, warmup_times=warmup_period)
-    results_visualization.plot_users_with_steady_state(measurements=measurements)
+    steady_state_metrics = save_steady_state_metrics(filtered_measurements)
+
+    time_key = seconds_to_time_string(start_working_time)
+
+    results_dict[time_key] = steady_state_metrics
+
+    # title = time_key + "-" + f"{seconds_to_time_string(start_working_time+1500)}"
 
     # Compare overall and steady-state metrics and generate a report for comparison
-    results_visualization.compare_metrics(data, filtered_measurements)
+    # results_visualization.compare_metrics(data, filtered_measurements, title)
+
+    filtered_measurements.reset_attributes()
+
+
+for slot_counter, start_working_time in enumerate(start_working_times):
+    simulation_pipeline(slot_counter, start_working_time)
+
+# Salva il dizionario in un file JSON
+output_file_path = "./report_images/result_of_the_simulations_for_comparison.json"
+with open(output_file_path, 'w') as json_file:
+    json.dump(results_dict, json_file, indent=4)
+
+# Generate various visualizations using the measurements and filtered steady-state data
+# Plot number of users over time with warm-up and steady-state periods highlighted
+results_visualization.plot_users_with_steady_state(measurements=measurements)
