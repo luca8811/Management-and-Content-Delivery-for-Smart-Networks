@@ -33,15 +33,15 @@
     }
   },
   "TASK2": {
-    "BASE_SERVICE_RATE": 5,
-    "BASE_BUFFER_SIZE": 5,
+    "BASE_SERVICE_RATE": 2,
+    "BASE_BUFFER_SIZE": 50,
     "ARRIVAL_RATE": 2,
     "drone_types": {
       "A": {
         "POW": "BAT",
         "m_ANTENNAS": 1,
         "SERVICE_RATE": 2,
-        "BUFFER_SIZE": 2
+        "BUFFER_SIZE": 1
       }
     },
     "configurations": {
@@ -53,18 +53,16 @@
     "SIM_TIME": 86400,
     "WORKING_SCHEDULING": {
       "I": [[36000, 39600],[54000, 57600]],
-      "II": [[28800, 72000]],
-      "III": [[28800, 43200],[50400, 59400]]
+      "II": [[28800, 43200],[50400, 59400]],
+      "III": [[28800, 72000]]
     },
     "RECHARGE_CONSTRAINT": {
-      "I": "inf",
-      "II": 3,
-      "III": 4,
-      "IV": 5,
-      "V": 6,
-      "VI": 7,
-      "VII": 8,
-      "VIII": 9
+      "I": 1,
+      "II": 2,
+      "III": 3,
+      "IV": 4,
+      "V": 5,
+      "VI": "inf"
     }
   },
   "TASK3": {

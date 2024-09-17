@@ -412,3 +412,44 @@ def seconds_to_time_string(seconds):
     # Returns the formatted string in the format HH:MM:SS
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
+
+def overall_metrics(data, working_time):
+    """
+    Compare overall and steady-state metrics in a dictionary format.
+
+    Args:
+        data: The filtered measurements for steady-state data.
+
+    Returns:
+        dict: A dictionary containing the steady-state metrics.
+    """
+
+    def round_if_number(value):
+        """Helper function to round a number to 3 decimal places, or return 'N/A'."""
+        if isinstance(value, (int, float)):
+            return round(value, 3)
+        return value
+
+    # Prepare the steady-state metrics in dictionary format
+    overall_metrics = {
+        'Working Time': round_if_number(working_time),
+        'Total Arrivals': round_if_number(data.arrivals),
+        'Total Departures': round_if_number(data.departures),
+        'Total Losses': round_if_number(data.losses),
+        'Arrival Rate': round_if_number(data.arrivals / working_time),
+        'Departure Rate': round_if_number(data.departures / working_time),
+        'Loss Rate': round_if_number(data.losses / working_time),
+        'Departures-Losses Ratio': round_if_number(
+            data.departures / data.losses
+        ) if data.losses > 0 else "N/A",
+        'Departures Percentage': round_if_number(
+            data.departures / data.arrivals * 100
+        ) if data.arrivals > 0 else "N/A",
+        'Average Users': round_if_number(data.total_users / working_time),
+        'Average Delay': round_if_number(
+            data.delay / data.departures
+        ) if data.departures > 0 else "N/A"
+    }
+
+    return overall_metrics
+

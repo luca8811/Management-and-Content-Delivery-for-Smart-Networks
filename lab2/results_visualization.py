@@ -284,3 +284,55 @@ def compare_metrics(data, filtered_measurements, title=None):
     plt.close()
 
     return df_comparison
+
+
+# Function to load the json file and generate the required plots
+def plot_simulation_data(file_path):
+    # Load the JSON data
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    # Prepare data for plotting
+    schedules = list(data.keys())
+
+    # Extracting relevant values
+    arrival_rates = [data[schedule]["Arrival Rate"] for schedule in schedules]
+    departure_rates = [data[schedule]["Departure Rate"] for schedule in schedules]
+    loss_rates = [data[schedule]["Loss Rate"] for schedule in schedules]
+    departure_percentages = [data[schedule]["Departures Percentage"] for schedule in schedules]
+    average_users = [data[schedule]["Average Users"] for schedule in schedules]
+    average_delays = [data[schedule]["Average Delay"] for schedule in schedules]
+
+    # Define a color palette with shades of blue and reduced bar width
+    colors = ['#A9D6E5', '#89C2D9', '#61A5C2', '#468FAF']
+    bar_width = 0.5
+
+    # Create subplots with shades of blue and reduced bar width
+    fig, axes = plt.subplots(2, 2, figsize=(12, 9))
+
+    # Subplot 1: Arrival Rate, Departure Rate, and Loss Rate
+    axes[0, 0].bar(schedules, arrival_rates, label='Arrival Rate', color=colors[0], alpha=0.85, width=bar_width)
+    axes[0, 0].bar(schedules, loss_rates, label='Loss Rate', color=colors[1], alpha=0.85, width=bar_width)
+    axes[0, 0].bar(schedules, departure_rates, label='Departure Rate', color=colors[3], alpha=0.85, width=bar_width)
+    axes[0, 0].set_title('Arrival Rate, Departure Rate, and Loss Rate')
+    axes[0, 0].legend()
+
+    # Subplot 2: Departure Percentage
+    axes[0, 1].bar(schedules, departure_percentages, color=colors[1], width=bar_width)
+    axes[0, 1].set_title('Departure Percentage')
+
+    # Subplot 3: Average Users
+    axes[1, 0].bar(schedules, average_users, color=colors[2], width=bar_width)
+    axes[1, 0].set_title('Average Users')
+
+    # Subplot 4: Average Delays
+    axes[1, 1].bar(schedules, average_delays, color=colors[3], width=bar_width)
+    axes[1, 1].set_title('Average Delays')
+
+    # Adjust layout
+    plt.tight_layout()
+
+    # Save the plot
+    output_filename = f"./report_images/plot_result_simulation.png"
+    plt.savefig(output_filename, bbox_inches='tight')
+    plt.close()
