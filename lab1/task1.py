@@ -1,55 +1,31 @@
 import random
 from queue import PriorityQueue
-from scipy.stats import t
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from utils.queues import MMmB, Packet
 from utils.measurements import Measurement
 
-# Fixed service time
-SERVICE = 15.0  # Constant service time for simplicity
-# Initialize variables for simulation
-BUFFER_SIZE = 0 # No buffer scenario as per Task 1
-SERVICE_TIMES = [SERVICE]  # One service unit, fixed service time
-SIM_TIME = 500000  # Simulation time in some units
-ARRIVAL_RATES = [0.2, 0.5, 0.7, 1]  # Arrival rates to be tested
-CONFIDENCE_LEVEL = 0.95  # Desired confidence level
-
-
-def compute_t_confidence_interval(sample, confidence_level):
-    """
-    Compute the t-distribution based confidence interval for a sample using scipy.stats.
-    """
-    sample_size = len(sample)
-    if sample_size < 2:
-        raise ValueError("Sample size must be greater than one for confidence interval calculation.")
-
-    sample_mean = sum(sample) / sample_size
-    sample_std_dev = math.sqrt(sum((x - sample_mean) ** 2 for x in sample) / (sample_size - 1))
-    standard_error = sample_std_dev / math.sqrt(sample_size)
-
-    # Degrees of freedom
-    degrees_of_freedom = sample_size - 1
-
-    # Calculate the t-distribution based confidence interval
-    confidence_interval = t.interval(confidence_level, degrees_of_freedom, sample_mean, standard_error)
-
-    return confidence_interval
-
+# Parametri di simulazione
+SERVICE = 15.0  # Tempo di servizio fisso
+BUFFER_SIZE = 0  # Nessun buffer come da Task 1
+SERVICE_TIMES = [SERVICE]
+SIM_TIME = 500000  # Tempo totale di simulazione
+ARRIVAL_RATES = [0.1, 0.5, 0.9, 1.1, 1.5]  # Tassi di arrivo da testare
 
 def arrival(time, FES, queue: MMmB, arrival_rate, data: Measurement):
     global users
     loss = False
     data.arrivals += 1
-    data.average_users += users * (time - data.time) #weighted time
+    data.average_users += users * (time - data.time)  # Tempo ponderato
     data.time = time
     try:
         if queue.buffer_size > 0:
             queue.insert(Packet(time))
             users += 1
         else:
-            # Directly attempt to process the packet if buffer size is 0
+            # Tenta di processare il pacchetto direttamente se il buffer è 0
             if queue.can_engage_server():
                 queue.insert(Packet(time))
                 users += 1
@@ -64,12 +40,11 @@ def arrival(time, FES, queue: MMmB, arrival_rate, data: Measurement):
     else:
         if queue.can_engage_server():
             s_id, _ = queue.engage_server()
-            service_time = SERVICE
-            FES.put((time + service_time, "departure", s_id)) #set departure event
+            service_time = random.expovariate(1.0 / SERVICE)
+            FES.put((time + service_time, "departure", s_id))  # Evento di partenza
 
-    inter_arrival = random.expovariate(1.0 / arrival_rate)
+    inter_arrival = random.expovariate(arrival_rate)
     FES.put((time + inter_arrival, "arrival", None))
-
 
 def departure(time, FES, queue: MMmB, server_id, data: Measurement):
     global users
@@ -80,39 +55,38 @@ def departure(time, FES, queue: MMmB, server_id, data: Measurement):
         data.transmitted_packets += 1
         data.delay += (time - client.arrival_time)
 
-        if client.start_service_time > client.arrival_time: #packet has waited in the line
+        if client.start_service_time > client.arrival_time:  # Il pacchetto ha aspettato in coda
             data.waiting_delay += client.start_service_time - client.arrival_time
             data.waiting_delays.append(client.start_service_time - client.arrival_time)
         data.average_users += users * (time - data.time)
         data.time = time
-        users -= 1 #descresing the users
+        users -= 1  # Decrementa il numero di utenti
         if queue.can_engage_server():
             s_id, _ = queue.engage_server()
-            service_time = SERVICE
+            service_time = random.expovariate(1.0 / SERVICE)
             FES.put((time + service_time, "departure", s_id))
             data.busy_time += service_time
 
-        # Handle buffer occupancy calculation
+        # Calcolo dell'occupazione del buffer
         if BUFFER_SIZE > 0:
             data.buffer_occupancy = users / BUFFER_SIZE
         else:
-            data.buffer_occupancy = 0  # If buffer size is 0, set occupancy to 0
+            data.buffer_occupancy = 0  # Se il buffer è 0, l'occupazione è 0
     else:
-        queue._servers[server_id].release()  # Release the server if no packets are left in the queue (become avaiable)
-
+        queue._servers[server_id].release()  # Libera il server se non ci sono pacchetti in coda
 
 if __name__ == '__main__':
-    random.seed(42)
+    random.seed(3)
     results = []
     delays = []
     loss_rates = []
     average_users_list = []
 
     for ARRIVAL in ARRIVAL_RATES:
-        data = Measurement()  # Usa la classe Measurement
+        data = Measurement()
         FES = PriorityQueue()
         FES.put((0, "arrival", None))
-        MMm = MMmB(power_supply="INF", service_times=SERVICE_TIMES, buffer_size=BUFFER_SIZE)  # Modifica qui
+        MMm = MMmB(power_supply="INF", service_times=SERVICE_TIMES, buffer_size=BUFFER_SIZE)
         users = 0
         time = 0
         while not FES.empty() and time < SIM_TIME:
@@ -122,64 +96,54 @@ if __name__ == '__main__':
             elif event_type == "departure":
                 departure(time, FES, MMm, server_id, data)
         average_delay = data.delay / data.departures if data.departures > 0 else 0
-        results.append(
-            f"Arrival Rate {ARRIVAL}: Users in queue: {users}, Arrivals: {data.arrivals}, Departures: {data.departures}, Avg Users: {data.average_users / time if time > 0 else 'No time passed'}, Avg Delay: {average_delay}, Loss Rate: {data.loss_probability if data.arrivals > 0 else 'No arrivals'}, Avg Waiting Delay: {data.waiting_delay / data.departures if data.departures > 0 else 0}, Avg Buffer Occupancy: {data.buffer_occupancy}, Busy Time: {data.busy_time}")
+        results.append({
+            'Arrival Rate': ARRIVAL,
+            'Users in Queue': users,
+            'Arrivals': data.arrivals,
+            'Departures': data.departures,
+            'Avg Users': data.average_users / time if time > 0 else 0,
+            'Avg Delay': average_delay,
+            'Loss Rate': data.loss_probability if data.arrivals > 0 else 0,
+            'Avg Waiting Delay': data.waiting_delay / data.departures if data.departures > 0 else 0,
+            'Avg Buffer Occupancy': data.buffer_occupancy,
+            'Busy Time': data.busy_time
+        })
         delays.append(average_delay)
         loss_rates.append(data.loss_probability if data.arrivals > 0 else 0)
         average_users_list.append(data.average_users / time if time > 0 else 0)
 
-    ci_lower, ci_upper = compute_t_confidence_interval(delays, CONFIDENCE_LEVEL)
-    results.append(
-        f"Confidence Interval for Average Delays at {CONFIDENCE_LEVEL * 100}% Confidence Level: ({ci_lower}, {ci_upper})")
+    # Imposta le opzioni di visualizzazione di pandas per mostrare tutte le colonne
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
 
-    for result in results:
-        print(result)
+    # Creazione di un DataFrame per visualizzare i risultati in modo tabellare
+    df_results = pd.DataFrame(results)
+    print(df_results)
 
-    # Grafici
-
-    # Set a consistent style for better visual appearance
-    plt.style.use('ggplot')
-
-    # Grafico 1: Average Delay vs Arrival Rate
-    plt.figure(figsize=(8, 6))
-    plt.plot(ARRIVAL_RATES, delays, marker='o')
+    # Plot of Average Delay vs Arrival Rate
+    plt.figure(figsize=(10, 6))
+    plt.plot(ARRIVAL_RATES, delays, marker='o', linestyle='-')
     plt.title('Average Delay vs Arrival Rate')
     plt.xlabel('Arrival Rate')
     plt.ylabel('Average Delay')
     plt.grid(True)
     plt.show()
 
-    # Grafico 2: Loss Rate vs Arrival Rate
-    plt.figure(figsize=(8, 6))
-    plt.plot(ARRIVAL_RATES, loss_rates, marker='o', color='red')
-    plt.title('Loss Rate vs Arrival Rate')
+    # Plot of Loss Probability vs Arrival Rate
+    plt.figure(figsize=(10, 6))
+    plt.plot(ARRIVAL_RATES, loss_rates, marker='s', color='r', linestyle='--')
+    plt.title('Loss Probability vs Arrival Rate')
     plt.xlabel('Arrival Rate')
-    plt.ylabel('Loss Rate')
+    plt.ylabel('Loss Probability')
     plt.grid(True)
     plt.show()
 
-    # Grafico 3: Average Number of Users vs Arrival Rate
-    plt.figure(figsize=(8, 6))
-    plt.plot(ARRIVAL_RATES, average_users_list, marker='o', color='green')
+    # Plot of Average Number of Users vs Arrival Rate
+    plt.figure(figsize=(10, 6))
+    plt.plot(ARRIVAL_RATES, average_users_list, marker='^', color='g', linestyle='-.')
     plt.title('Average Number of Users vs Arrival Rate')
     plt.xlabel('Arrival Rate')
     plt.ylabel('Average Number of Users')
-    plt.grid(True)
-    plt.show()
-
-    # Plot for task 1.b: Confidence Intervals for Average Delay
-    ci_lower, ci_upper = compute_t_confidence_interval(delays, CONFIDENCE_LEVEL)
-
-    plt.figure(figsize=(8, 6))
-
-    # Confidence interval plot for Average Delay
-    plt.errorbar(ARRIVAL_RATES, delays,
-                 yerr=[delays - ci_lower, ci_upper - delays],
-                 fmt='o', capsize=5, capthick=2, ecolor='blue')
-    plt.title(f'Average Delay with {CONFIDENCE_LEVEL * 100}% Confidence Interval')
-    plt.xlabel('Arrival Rate')
-    plt.ylabel('Average Delay')
-
     plt.grid(True)
     plt.show()
 

@@ -70,6 +70,8 @@ class MMmB:
         self._servers: dict[int, Server] = {i: Server(service_times[i]) for i in range(len(service_times))}
         self._rr_scheduling: list[int] = list(self._servers.keys())
         self._scheduling_policy = self._get_server_fastest
+        self.users = 0
+
 
     def battery_recharge(self):
         self.battery.status = BatteryStatus.FULL
