@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 # Constants
 SERVICE = 20.0
-ARRIVAL = 3
-BUFFER_SIZE = 100
+ARRIVAL = 4
+BUFFER_SIZE = 50
 m_ANTENNAS = 3
 N_DRONES = 1
 SERVICE_TIMES = [SERVICE / (i + 1) for i in range(m_ANTENNAS)]
@@ -104,13 +104,12 @@ def departure(time, FES, queue_id, server_id, data, MMms, resolve_MMm):
         FES.put((time + service_duration, "departure", queue_id, server_id))
 
 
-def plot_server_loads(servers, title="Server Load Distribution"):
+def plot_server_loads(servers, title="Server Load Distribution", filename="server_load.png"):
     service_times = [server.total_time_engaged for server in servers]
-    selections = [server.selection_count for server in servers]
 
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
-    colors = ['tab:red', 'tab:blue']
+    colors = ['tab:red']
     ax1.set_xlabel('Server', fontsize=14)
     ax1.set_ylabel('Total Time Engaged', color=colors[0], fontsize=14)
     bars = ax1.bar(range(len(service_times)), service_times, color=colors[0])
@@ -121,17 +120,16 @@ def plot_server_loads(servers, title="Server Load Distribution"):
     for i, val in enumerate(service_times):
         ax1.text(i, val, f"{val:.2f}", ha='center', va='bottom', fontsize=10)
 
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Selection Count', color=colors[1], fontsize=14)
-    line, = ax2.plot(range(len(selections)), selections, color=colors[1], marker='o', label='Selection Count')
-    ax2.tick_params(axis='y', labelcolor=colors[1], labelsize=12)
-
-    ax1.legend([bars, line], ['Total Time Engaged', 'Selection Count'], loc='upper left', fontsize=12)
+    ax1.legend([bars], ['Total Time Engaged'], loc='upper left', fontsize=12)
 
     plt.title(title, fontsize=16)
     plt.tight_layout()
 
+    # Salva l'immagine come file PNG
+    plt.savefig(filename, format='png')  # Salva l'immagine con il nome fornito
+
     plt.show()
+
 
 
 if __name__ == '__main__':
