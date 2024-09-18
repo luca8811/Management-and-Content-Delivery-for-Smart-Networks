@@ -56,19 +56,24 @@ def arrival(time, FES, queue_id, data, MMms, resolve_MMm):
         data.losses += 1
     else:
         users += 1
-        packet = Packet(time)
-        queue.insert(packet)
+        packet = Packet(time)  # Crea un nuovo pacchetto con il tempo di arrivo
+        queue.insert(packet)  # Inserisci il pacchetto nella coda
         data.buffer_occupancy += queue.queue_size()
 
     inter_arrival = random.expovariate(1.0 / ARRIVAL)
     FES.put((time + inter_arrival, "arrival", resolve_MMm(), None))
 
+    # Se il server può essere occupato, inizia il servizio per il pacchetto
     if queue.can_engage_server():
         server_id = queue._scheduling_policy()
         server = queue._servers[server_id]
         service_duration = random.expovariate(1.0 / server.service_time)
-        packet.start_service_time = time  # Inizializza qui, prima di engage_server
-        queue.engage_server()
+
+        # Recupera il pacchetto dalla coda
+        next_packet = queue.get_last()  # Verifica se `get_last()` è il metodo giusto per ottenere il pacchetto
+        next_packet.start_service_time = time  # Inizia il tempo di servizio per il pacchetto
+
+        queue.engage_server()  # Segnala che il server è impegnato
         server.engage(service_duration)
         FES.put((time + service_duration, "departure", queue_id, server_id))
 
@@ -102,6 +107,12 @@ def departure(time, FES, queue_id, server_id, data, MMms, resolve_MMm):
         next_packet.start_service_time = time
         queue.engage_server()
         FES.put((time + service_duration, "departure", queue_id, server_id))
+
+def print_server_busy_ratios(servers, sim_time):
+    for i, server in enumerate(servers):
+        busy_time_ratio = server.total_time_engaged / sim_time
+        print(f"  Server {i+1} busy time ratio: {busy_time_ratio:.4f}")
+
 
 
 def plot_server_loads(servers, title="Server Load Distribution", filename="server_load.png"):
@@ -148,6 +159,6 @@ if __name__ == '__main__':
         print(f"  Average waiting delay: {data.waiting_delay / data.departures if data.departures > 0 else 0}")
         print(f"  Loss probability: {data.losses / data.arrivals if data.arrivals > 0 else 0}")
         print(f"  Average buffer occupancy: {data.buffer_occupancy / data.arrivals if data.arrivals > 0 else 0}")
-        print(f"  Busy time ratio: {data.busy_time / SIM_TIME}")
-
+        # Stampa il busy time ratio per ogni server
+        print_server_busy_ratios(servers, SIM_TIME)
         plot_server_loads(list(servers), f"Load Distribution for {policy.capitalize()} Scheduling")
