@@ -1,15 +1,12 @@
 import json
+import os
 import random
+import shutil
 from enum import Enum
 from queue import PriorityQueue
-import numpy as np
-import pandas as pd
-import os
-import shutil
-import json
 
 import arrivals_profile
-from utils.measurements import Measurement, Measurements, FilteredMeasurements
+from utils.measurements import Measurement, Measurements
 from utils.queues import BatteryStatus, Battery, Packet
 
 # LEGEND:
@@ -19,6 +16,12 @@ variables = {}
 MMms = {}
 data = Measurement()
 measurements = Measurements()
+
+
+def init_simulation_environment():
+    global data, measurements
+    data = Measurement()
+    measurements = Measurements()
 
 
 def init_variables(task):
@@ -44,6 +47,11 @@ def is_drone_available(time, drone: MMms):
             and not drone.has_exceeded_max_complete_cycles()
             and drone.battery.status == BatteryStatus.IN_USE
             and not drone.is_queue_full())
+
+def is_drone_ready(time, drone: MMms):
+    return (drone.battery.status in [BatteryStatus.PAUSED, BatteryStatus.FULL]
+            and drone.is_in_working_slot(time)
+            and not drone.has_exceeded_max_complete_cycles())
 
 
 def assign_packet_to_drone(time):
@@ -94,11 +102,7 @@ def request_drone(time):
     It returns the id of the fastest (average service time of its servers)
     drone, if any available (battery not empty).
     """
-
-    def is_available(drone: tuple[int, MMms]):
-        return drone[1].battery.status in [BatteryStatus.PAUSED, BatteryStatus.FULL]
-
-    drones = list(filter(is_available, MMms.items()))
+    drones = list(filter(lambda drone: is_drone_ready(time, drone[1]), MMms.items()))
     if len(drones) > 0:
         drones = sorted(drones, key=lambda drone: drone[1].get_capacity(), reverse=True)
         i_max = len(drones) - 1
@@ -339,11 +343,11 @@ def start_working_intervals(simulation_time, working_schedule_lists):
     start_slot = working_schedule_lists[0][0]
     end_slot = working_schedule_lists[0][1]
     start_times = []
-    working_interval = 25*60
-    charging_interval = 60*60
+    working_interval = 25 * 60
+    charging_interval = 60 * 60
     working_cycle = working_interval + charging_interval
     working_slots = int(simulation_time / working_cycle)
-    for i in range(working_slots+1):
+    for i in range(working_slots + 1):
         initial_time = working_cycle * i
         if start_slot <= initial_time <= end_slot:
             start_times.append(initial_time)
@@ -378,7 +382,8 @@ def save_steady_state_metrics(filtered_measurements):
         'Total Departures': round_if_number(filtered_measurements.departures),
         'Total Losses': round_if_number(filtered_measurements.losses),
         'Arrival Rate': round_if_number(filtered_measurements.arrivals / filtered_measurements.steady_state_interval),
-        'Departure Rate': round_if_number(filtered_measurements.departures / filtered_measurements.steady_state_interval),
+        'Departure Rate': round_if_number(
+            filtered_measurements.departures / filtered_measurements.steady_state_interval),
         'Loss Rate': round_if_number(filtered_measurements.losses / filtered_measurements.steady_state_interval),
         'Departures-Losses Ratio': round_if_number(
             filtered_measurements.departures / filtered_measurements.losses
@@ -386,7 +391,8 @@ def save_steady_state_metrics(filtered_measurements):
         'Departures Percentage': round_if_number(
             filtered_measurements.departures / filtered_measurements.arrivals * 100
         ) if filtered_measurements.arrivals > 0 else "N/A",
-        'Average Users': round_if_number(filtered_measurements.total_users / filtered_measurements.steady_state_interval),
+        'Average Users': round_if_number(
+            filtered_measurements.total_users / filtered_measurements.steady_state_interval),
         'Average Delay': round_if_number(
             filtered_measurements.delay / filtered_measurements.departures
         ) if filtered_measurements.departures > 0 else "N/A"
@@ -452,4 +458,3 @@ def overall_metrics(data, working_time):
     }
 
     return overall_metrics
-
