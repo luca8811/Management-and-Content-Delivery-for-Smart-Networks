@@ -4,7 +4,7 @@ from queue import PriorityQueue
 import lab2
 import results_visualization
 from lab2 import Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off
-from utils.measurements import Measurement, Measurements
+from utils.measurements import Measurements
 from utils.queues import MMmB
 
 lab2.init_variables('TASK4')
@@ -14,7 +14,7 @@ drone_types = variables['drone_types']
 # Control plane for simulation configuration and results visualization
 run_specific_simulations = True
 specific_simulations = {
-    'drones_configuration': ['I', 'II', 'III'],
+    'drones_configuration': ['I', 'II', 'III', 'IV', 'V', 'VI'],
     'working_slots': ['II']
 }
 want_print_results = True
@@ -55,19 +55,6 @@ def run_simulation(working_slots, drones_configuration, seed=0):
     return data, measurements
 
 
-def print_results(data: Measurement):
-    print('No. of users in the queue:', data.users)
-    print('No. of arrivals =', data.arrivals, '- No. of departures =', data.departures)
-    print('Measured arrival rate: ', data.arrivals / sim_time, ' - Measured departure rate: ',
-          data.departures / sim_time)
-    print('Loss rate: ', data.losses / sim_time, ' - Packets lost: ', data.losses)
-    print('Departures-losses ratio: ', data.departures / data.losses)
-    print('Departures percentage: {:.1f}%'.format(data.departures / data.arrivals * 100))
-    print('Average number of users: ', data.average_users / sim_time)
-    print('Average delay: ', data.delay / data.departures)
-    # print('Complete discharging/charging cycles: ', data.)
-
-
 def plot_results(measurements: Measurements):
     results_visualization.plot_users(measurements)
     # results_visualization.plot_arrivals(measurements)
@@ -79,10 +66,8 @@ def plot_results(measurements: Measurements):
 
 
 if __name__ == '__main__':
-    sim_start = variables['SIM_START']
-    sim_time = variables['SIM_TIME']
-    sim_stop = sim_start + sim_time
-    results_visualization.SIM_START = sim_start
+    results_visualization.SIM_START = variables['SIM_START']
+    results_visualization.SIM_TIME = variables['SIM_TIME']
 
     if not run_specific_simulations:
         drones_configurations = variables['configurations'].keys()
@@ -92,10 +77,11 @@ if __name__ == '__main__':
         working_slots = specific_simulations['working_slots']
     for drones_configuration in drones_configurations:
         for working_scheduling in working_slots:
-            print('\nRunning simulation with drones configuration ', drones_configuration)
+            print('\nRunning simulation with drones configuration \'{:s}\' and scheduling strategy \'{:s}\''.format(
+                drones_configuration, working_scheduling))
             data, measurements = run_simulation(working_slots=variables['WORKING_SCHEDULING'][working_scheduling],
                                                 drones_configuration=variables['configurations'][drones_configuration])
             if want_print_results:
-                print_results(data)
+                results_visualization.print_results(data)
             if want_plot_results:
                 plot_results(measurements)

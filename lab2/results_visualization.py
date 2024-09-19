@@ -1,11 +1,25 @@
 import matplotlib.pyplot as plt
 import json
-from utils.measurements import Measurements
+from utils.measurements import Measurement, Measurements
 import pandas as pd
 import numpy as np
 import re
 
 SIM_START = 0
+SIM_TIME = 0
+
+
+def print_results(data: Measurement):
+    print('No. of users in the queue: ', data.users)
+    print('No. of arrivals: ', data.arrivals, '- No. of departures: ', data.departures)
+    print('Measured arrival rate: {:.3f} - Measured departure rate: {:.3f}'.format(data.arrivals / SIM_TIME,
+                                                                                   data.departures / SIM_TIME))
+    print('Loss rate: {:.3f}'.format(data.losses / SIM_TIME), ' - Packets lost: {:.3f}'.format(data.losses))
+    print('Departures-losses ratio: {:.3f}'.format(data.departures / data.losses))
+    print('Departures percentage: {:.3f}%'.format(data.departures / data.arrivals * 100))
+    print('Average number of users: {:.3f}'.format(data.average_users / SIM_TIME))
+    print('Average delay: {:.3f} s/packet'.format(data.delay / data.departures))
+    print('Complete discharging/charging cycles: ', data.charging_cycles)
 
 
 def plot_users(measurements: Measurements):
@@ -400,6 +414,3 @@ def plot_metric(result_dict, metric="Departures Percentage"):
     # Save the plot as an image
     plt.savefig(f"./report_images/{metric.replace(' ', '_').lower()}_plot.png")
     plt.close()
-
-
-
