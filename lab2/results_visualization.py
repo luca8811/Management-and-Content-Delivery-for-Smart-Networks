@@ -339,7 +339,7 @@ def plot_simulation_data(file_path):
     plt.close()
 
 
-def plot_metric(result_dict, metric="Departures Percentage"):
+def plot_metric_recharges(result_dict, metric="Departures Percentage"):
     """
     Plots the specified metric (Departure Percentage or Departure Rate) for different Working Schedules and recharge cycles.
 
@@ -402,4 +402,75 @@ def plot_metric(result_dict, metric="Departures Percentage"):
     plt.close()
 
 
+def plot_metric_by_power_supply(result_dict, metric="Departures Percentage", max_recharges="inf"):
+    """
+    Plots the specified metric (Departure Percentage or Departure Rate) for different Power Supply types and Working Slots.
+    Includes the maximum number of recharges in the plot title.
+
+    :param result_dict: Dictionary with the simulation results
+    :param metric: The metric to plot, can be either "Departures Percentage" or "Departure Rate"
+    :param max_recharges: String representing the maximum allowed recharges (e.g., "1", "2", "inf")
+    """
+    # Define power supply types and working slots
+    power_supplies = ['W45', 'W65', 'W75']
+    working_slots = ['I', 'II', 'III']
+
+    # Set up the figure and subplots
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    # Find the maximum value of the specified metric across all power supplies and working slots
+    max_metric_value = 0
+    for supply in power_supplies:
+        for slot in working_slots:
+            key = f"{supply} {slot}"
+            if key in result_dict:
+                max_metric_value = max(max_metric_value, result_dict[key][metric])
+
+    # Add a margin to the max value to leave space above the bars
+    max_y_lim = max_metric_value + 5
+
+    # For each power supply, create a barplot for the working slots
+    for i, supply in enumerate(power_supplies):
+        metric_values = []
+
+        # Extract metric values for each working slot for the current power supply
+        for slot in working_slots:
+            key = f"{supply} {slot}"
+            if key in result_dict:
+                metric_values.append(result_dict[key][metric])
+            else:
+                metric_values.append(0)  # If data is missing, use 0
+
+        # Create the barplot for the current power supply
+        axes[i].bar(working_slots, metric_values, color='lightgreen')
+        axes[i].set_title(f"Power Supply {supply}", fontsize=14)
+        axes[i].set_xlabel("Working Slots", fontsize=12)
+
+        # Set yticks to match the unique metric values for each subplot
+        unique_yticks = np.unique(metric_values)
+        axes[i].set_yticks(unique_yticks)
+
+        # Set the same Y limit for all subplots
+        axes[i].set_ylim(0, max_y_lim)
+
+    # Set a common Y axis label depending on the metric being plotted
+    if metric == "Departures Percentage":
+        axes[0].set_ylabel("Departure Percentage (%)", fontsize=12)
+    elif metric == "Departure Rate":
+        axes[0].set_ylabel("Departure Rate (departures/second)", fontsize=12)
+
+    # Add a title for the entire plot including the max recharges
+    if max_recharges == "inf":
+        title = f"{metric} with Infinite Max Recharges"
+    else:
+        title = f"{metric} with {max_recharges} Max Recharges"
+
+    fig.suptitle(title, fontsize=16)
+
+    # Compact layout
+    plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave space for the main title
+
+    # Save the plot as an image
+    plt.savefig(f"./report_images/{metric.replace(' ', '_').lower()}_power_supply_plot_max_recharges_{max_recharges}.png")
+    plt.close()
 

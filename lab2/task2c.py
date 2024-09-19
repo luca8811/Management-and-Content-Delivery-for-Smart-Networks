@@ -1,12 +1,11 @@
 import json
 import random
 from queue import PriorityQueue
-import matplotlib.pyplot as plt
 
 import results_visualization
 import lab2
 from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, clear_folder, overall_metrics,
-                  working_time_by_schedule_and_recharges)
+                  working_time_by_schedule_and_recharges, calculate_working_cycles)
 from utils.queues import MMmB
 
 # Clear the folder where report images will be stored to ensure fresh output.
@@ -25,8 +24,16 @@ results_dict = {}
 
 # Function to run the simulation for a given WORKING_SCHEDULING configuration
 def run_simulation(scheduling_key, recharging_key):
-    # Initialize different drone types based on the configuration 'I'
+
+    working_schedule_lists = variables["WORKING_SCHEDULING"][scheduling_key]
+    max_recharges = variables["RECHARGE_CONSTRAINT"][recharging_key]
+
     drone = variables["drone_types"]['A']  # Get drone specifications from configuration
+    power_supply = drone["POW"]
+
+    # Calculate total working time for the current WORKING_SCHEDULING and MAX RECHARGES
+    working_time = working_time_by_schedule_and_recharges(max_recharges, working_schedule_lists, power_supply)
+    working_cycles = calculate_working_cycles(max_recharges, power_supply, working_schedule_lists)
 
     # Initialize an MMmB object for each drone type with its properties like power,
     # service rate, and buffer size
@@ -57,15 +64,7 @@ def run_simulation(scheduling_key, recharging_key):
         elif event_type == Event.RECHARGE:
             evt_recharge(time, drone_id)
 
-    max_recharges = variables["RECHARGE_CONSTRAINT"][recharging_key]
-    working_schedule_lists = variables["WORKING_SCHEDULING"][scheduling_key]
-
-    # Calculate total working time for the current WORKING_SCHEDULING and MAX RECHARGES
-    working_time = working_time_by_schedule_and_recharges(max_recharges, working_schedule_lists)
-
-    results = overall_metrics(data, working_time)
-    dict_key = scheduling_key + " " + str(max_recharges)
-    results_dict[dict_key] = results
+    results_dict[scheduling_key + " " + str(max_recharges)] = overall_metrics(data, working_time, working_cycles)
 
 # Run the simulation for each WORKING_SCHEDULING and RECHARGE_CONSTRAINT configuration
 for scheduling_key in variables[f"WORKING_SCHEDULING"]:
@@ -84,5 +83,4 @@ output_file_path = "./report_images/result_task_2_c.json"
 with open(output_file_path, 'w') as json_file:
     json.dump(results_dict, json_file, indent=4)
 
-results_visualization.plot_metric(results_dict, metric="Departures Percentage")
-results_visualization.plot_metric(results_dict, metric="Departure Rate")
+results_visualization.plot_metric_recharges(results_dict, metric="Departures Percentage")

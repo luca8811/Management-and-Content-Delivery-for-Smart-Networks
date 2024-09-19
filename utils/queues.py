@@ -72,7 +72,6 @@ class MMmB:
         self._scheduling_policy = self._get_server_fastest
         self.users = 0
 
-
     def battery_recharge(self):
         self.battery.status = BatteryStatus.FULL
         self.battery.complete_cycles += 1
