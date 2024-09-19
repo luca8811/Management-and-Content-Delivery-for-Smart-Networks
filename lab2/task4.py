@@ -4,7 +4,7 @@ from queue import PriorityQueue
 import lab2
 import results_visualization
 from lab2 import Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off
-from utils.measurements import Measurements
+from utils.measurements import Measurement, Measurements
 from utils.queues import MMmB
 
 lab2.init_variables('TASK4')
@@ -14,11 +14,12 @@ drone_types = variables['drone_types']
 # Control plane for simulation configuration and results visualization
 run_specific_simulations = True
 specific_simulations = {
-    'drones_configuration': ['I', 'II', 'III', 'IV', 'V', 'VI'],
+    'drones_configurations': ['I', 'II', 'III', 'IV', 'V', 'VI'],
     'working_slots': ['II']
 }
 want_print_results = True
 want_plot_results = False
+scores = {}
 
 
 def run_simulation(working_slots, drones_configuration, seed=0):
@@ -55,6 +56,40 @@ def run_simulation(working_slots, drones_configuration, seed=0):
     return data, measurements
 
 
+def generate_score_from_measurement(data: Measurement):
+    return {
+        'departures_fraction': data.departures / data.arrivals,
+        'average_delay': data.delay / data.departures,
+        'charging_cycles': data.charging_cycles,
+        'complete_results': data,
+        'overall_score': 0
+    }
+
+
+def evaluate_overall_scores():
+    departures_fractions = []
+    average_delays = []
+    charging_cycles = []
+    for score in scores.values():
+        departures_fractions.append(score['departures_fraction'])
+        average_delays.append(score['average_delay'])
+        charging_cycles.append(score['charging_cycles'])
+    departures_fraction_min = min(departures_fractions)
+    average_delay_min = min(average_delays)
+    charging_cycle_min = min(charging_cycles)
+    departures_fraction_slider = max(departures_fractions) - departures_fraction_min
+    average_delay_slider = max(average_delays) - average_delay_min
+    charging_cycle_slider = max(charging_cycles) - charging_cycle_min
+    for configuration, score in scores.items():
+        departures_fractions_score = (score[
+                                          'departures_fraction'] - departures_fraction_min) / departures_fraction_slider + 1
+        average_delay_score = (score['average_delay'] - average_delay_min) / average_delay_slider + 1
+        charging_cycles_score = (score['charging_cycles'] - charging_cycle_min) / charging_cycle_slider + 1
+        good_scores = departures_fractions_score
+        bad_scores = average_delay_score * charging_cycles_score
+        scores[configuration]['overall_score'] = good_scores / bad_scores
+
+
 def plot_results(measurements: Measurements):
     results_visualization.plot_users(measurements)
     # results_visualization.plot_arrivals(measurements)
@@ -73,7 +108,7 @@ if __name__ == '__main__':
         drones_configurations = variables['configurations'].keys()
         working_slots = variables['WORKING_SCHEDULING'].keys()
     else:
-        drones_configurations = specific_simulations['drones_configuration']
+        drones_configurations = specific_simulations['drones_configurations']
         working_slots = specific_simulations['working_slots']
     for drones_configuration in drones_configurations:
         for working_scheduling in working_slots:
@@ -81,7 +116,19 @@ if __name__ == '__main__':
                 drones_configuration, working_scheduling))
             data, measurements = run_simulation(working_slots=variables['WORKING_SCHEDULING'][working_scheduling],
                                                 drones_configuration=variables['configurations'][drones_configuration])
-            if want_print_results:
-                results_visualization.print_results(data)
+            scores[drones_configuration] = generate_score_from_measurement(data)
+            # NOTE: DO NOT DELETE THESE COMMENTS!!!
+            # Note: these two lines below were used to understand which scheduling strategy is the most suitable,
+            # while 'scores' makes sense only with the assumption that only one scheduling strategy is applied
+            # if want_print_results:
+            #     results_visualization.print_results(data)
             if want_plot_results:
                 plot_results(measurements)
+    evaluate_overall_scores()
+    if want_print_results:
+        for drones_configuration in drones_configurations:
+            print('\nResults for simulation with drones configuration \'{:s}\''.format(drones_configuration))
+            results_visualization.print_results(scores[drones_configuration]['complete_results'])
+            print('Overall score for configuration \'{:s}\': {:f}\n'.format(drones_configuration,
+                                                                            scores[drones_configuration][
+                                                                                'overall_score']))
