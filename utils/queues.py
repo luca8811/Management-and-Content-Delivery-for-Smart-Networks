@@ -175,5 +175,6 @@ class MMmB:
         is greater than or equal to the maximum limit of charging cycles.
         """
         if not self.maximum_recharge_cycles == "inf":
+            assert isinstance(self.maximum_recharge_cycles, int)
             return self.battery.complete_cycles >= self.maximum_recharge_cycles
         return False

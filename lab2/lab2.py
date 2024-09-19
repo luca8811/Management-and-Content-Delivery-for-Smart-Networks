@@ -149,6 +149,7 @@ def evt_recharge(time, drone_id):
     drone = MMms[drone_id]
     drone.battery_recharge()
     data.charging_drones -= 1
+    data.charging_cycles += 1
     measurements.add_measurement(measurement=data)
 
 
