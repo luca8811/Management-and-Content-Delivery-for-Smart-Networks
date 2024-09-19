@@ -1,6 +1,5 @@
 import random
 from queue import PriorityQueue
-
 import lab2
 import results_visualization
 from lab2 import Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off
@@ -62,7 +61,8 @@ def generate_score_from_measurement(data: Measurement):
         'average_delay': data.delay / data.departures,
         'charging_cycles': data.charging_cycles,
         'complete_results': data,
-        'overall_score': 0
+        'overall_score': 0,
+        'score_position': 0
     }
 
 
@@ -88,6 +88,9 @@ def evaluate_overall_scores():
         good_scores = departures_fractions_score
         bad_scores = average_delay_score * charging_cycles_score
         scores[configuration]['overall_score'] = good_scores / bad_scores
+    sorted_scores = dict(sorted(scores.items(), key=lambda x: x[1]['overall_score'], reverse=True))
+    for score_pos, configuration in enumerate(sorted_scores.keys()):
+        scores[configuration]['score_position'] = score_pos + 1
 
 
 def plot_results(measurements: Measurements):
@@ -129,6 +132,5 @@ if __name__ == '__main__':
         for drones_configuration in drones_configurations:
             print('\nResults for simulation with drones configuration \'{:s}\''.format(drones_configuration))
             results_visualization.print_results(scores[drones_configuration]['complete_results'])
-            print('Overall score for configuration \'{:s}\': {:f}\n'.format(drones_configuration,
-                                                                            scores[drones_configuration][
-                                                                                'overall_score']))
+            print('Overall score: {:f}'.format(scores[drones_configuration]['overall_score']))
+            print('Ranking position (based on overall score): ', scores[drones_configuration]['score_position'])
