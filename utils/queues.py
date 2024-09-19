@@ -72,7 +72,6 @@ class MMmB:
         self._scheduling_policy = self._get_server_fastest
         self.users = 0
 
-
     def battery_recharge(self):
         self.battery.status = BatteryStatus.FULL
         self.battery.complete_cycles += 1
@@ -124,11 +123,12 @@ class MMmB:
         Determine if any servers are available to start serving a packet.
         """
         n_servers_w = self._get_servers_working()
-        # If buffer_size is 0, we check if there's an immediate slot for processing.
-        return self._get_servers_working() < min(len(self._servers), self.queue_size())
-        # if self.buffer_size == 0:
-        #     return n_servers_w < len(self._servers)
-        # return n_servers_w < len(self._servers) and n_servers_w < self.queue_size()
+        if self.buffer_size == 0:
+            # Se non c'è buffer, controlla semplicemente se esiste un server libero
+            return n_servers_w < len(self._servers)
+        else:
+            # Se c'è un buffer, controlla sia la disponibilità del server che lo spazio nel buffer
+            return n_servers_w < len(self._servers) and n_servers_w < self.queue_size()
 
     def _get_server_random(self):
         return random.choice(self._get_available_servers())

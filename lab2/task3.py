@@ -1,47 +1,59 @@
+import json
 import random
 from queue import PriorityQueue
-import lab2
+
 import results_visualization
-from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, clear_folder)
+import lab2
+from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, clear_folder, overall_metrics,
+                  calculate_working_cycles, working_time_by_schedule_and_recharges)
 from utils.queues import MMmB
-import json  # Import JSON for saving results
 
 # Clear the folder where report images will be stored to ensure fresh output.
 clear_folder('./report_images')
 
 # Initialize variables and configurations for the simulation
-lab2.init_variables("TASK2")
+lab2.init_variables("TASK3")
 variables = lab2.variables
 MMms = lab2.MMms
 measurements = lab2.measurements
 data = lab2.data
+
+max_recharges = variables["RECHARGE_CONSTRAINT"]["IV"]
 
 # Initialize a dictionary to store the departure rate results
 results_dict = {}
 
 
 # Function to run the simulation for a given WORKING_SCHEDULING configuration
-def run_simulation(scheduling_key, battery_strategy, configurations):
-    # Initialize drone configurations based on the selected WORKING_SCHEDULING value
-    drone_types = variables['drone_types']
-    for i, drone_type in enumerate(variables['configurations'][configurations]):
-        drone = drone_types[drone_type]
-        MMms[i] = MMmB(
-            power_supply=drone['POW'],
-            service_times=[1 / (variables['BASE_SERVICE_RATE'] * drone['SERVICE_RATE']) for m in
-                           range(drone['m_ANTENNAS'])],
-            buffer_size=variables['BASE_BUFFER_SIZE'] * drone['BUFFER_SIZE'],
-            maximum_recharge_cycles=variables["RECHARGE_CONSTRAINT"][battery_strategy],
-            working_slots=variables["WORKING_SCHEDULING"][scheduling_key]
-        )
+def run_simulation(scheduling_key, configuration):
+
+    working_schedule_lists = variables["WORKING_SCHEDULING"][scheduling_key]
+
+    drone_type = variables["configurations"][configuration][0]
+    drone = variables["drone_types"][drone_type]  # Get drone specifications from configuration
+    power_supply = drone["POW"]
+
+    working_time = working_time_by_schedule_and_recharges(max_recharges, working_schedule_lists, power_supply)
+    working_cycles = calculate_working_cycles(max_recharges, power_supply, working_schedule_lists)
+
+    # Initialize an MMmB object for each drone type with its properties like power,
+    # service rate, and buffer size
+    MMms[0] = MMmB(
+        power_supply=power_supply,  # Power supply of the drone
+        service_times=[1 / (variables['BASE_SERVICE_RATE'] * drone['SERVICE_RATE'])],
+        buffer_size=variables['BASE_BUFFER_SIZE'] * drone['BUFFER_SIZE'],  # Buffer size is multiplied by drone's factor
+        maximum_recharge_cycles=max_recharges,
+        # Max number of recharge cycles for the drone
+        working_slots=working_schedule_lists  # Time intervals when the drone is operational
+    )
 
     # Simulation logic (same as before)
     random.seed(42)
-    time = 0
+    time = variables['SIM_START']
     FES = PriorityQueue()
-    FES.put((0, Event.ARRIVAL, None, None))
+    FES.put((time, Event.ARRIVAL, None, None))
 
-    while time < variables['SIM_TIME']:
+    while time < variables['SIM_START'] + variables['SIM_TIME']:
         (time, event_type, drone_id, arg) = FES.get()
 
         if event_type == Event.ARRIVAL:
@@ -53,33 +65,25 @@ def run_simulation(scheduling_key, battery_strategy, configurations):
         elif event_type == Event.RECHARGE:
             evt_recharge(time, drone_id)
 
-    # Calculate total working time for the current WORKING_SCHEDULING
-    working_time = sum(slot[1] - slot[0] for slot in variables['WORKING_SCHEDULING'][scheduling_key])
+    results_dict[power_supply + " " + scheduling_key] = overall_metrics(data, working_time, working_cycles)
 
-    # Calculate departure rate using the working time
-    departure_rate = data.departures / working_time
+# Run the simulation for each WORKING_SCHEDULING and RECHARGE_CONSTRAINT configuration
+for configuration in variables["configurations"]:
+    for scheduling_key in variables["WORKING_SCHEDULING"]:
 
-    # Add results to the dictionary
-    key = f"WORKING_SCHEDULING_{scheduling_key}_RECHARGE_CONSTRAINT_{battery_strategy}"
-    results_dict[key] = {
-        "departure_rate": departure_rate,
-        "arrivals": data.arrivals,
-        "departures": data.departures,
-        "losses": data.losses
-    }
+        # Reset metrics at each simulation
+        lab2.init_simulation_environment()
+        measurements = lab2.measurements
+        data = lab2.data
 
-    # Return the data
-    return measurements, data
+        # Run the simulation and get the results
+        run_simulation(scheduling_key, configuration)
 
-
-# Run simulations for each combination of WORKING_SCHEDULING and RECHARGE_CONSTRAINT
-for scheduling_key in variables["WORKING_SCHEDULING"]:
-    for battery_strategy in variables['RECHARGE_CONSTRAINT']:
-        for configurations in variables['configurations']:
-            measurements, data = run_simulation(scheduling_key, battery_strategy, configurations)
-
-# Save the results to a JSON file
-with open("simulation_results_task3.json", "w") as json_file:
+# Salva il dizionario in un file JSON
+output_file_path = "./report_images/result_task_3.json"
+with open(output_file_path, 'w') as json_file:
     json.dump(results_dict, json_file, indent=4)
 
-print("Results saved to simulation_results.json")
+results_visualization.plot_metric_by_power_supply(results_dict,
+                                                  metric="Departures Percentage",
+                                                  max_recharges=max_recharges)

@@ -5,9 +5,9 @@ from utils.measurements import Measurement
 import matplotlib.pyplot as plt
 
 # Constants
-SERVICE = 20.0
+SERVICE = 15.0
 ARRIVAL = 4
-BUFFER_SIZE = 50
+BUFFER_SIZE = 30
 m_ANTENNAS = 3
 N_DRONES = 1
 SERVICE_TIMES = [SERVICE / (i + 1) for i in range(m_ANTENNAS)]

@@ -76,7 +76,7 @@ def departure(time, FES, queue: MMmB, server_id, data: Measurement):
         queue._servers[server_id].release()  # Libera il server se non ci sono pacchetti in coda
 
 if __name__ == '__main__':
-    random.seed(3)
+    random.seed(42)
     results = []
     delays = []
     loss_rates = []
