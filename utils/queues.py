@@ -42,7 +42,6 @@ class BatteryStatus(Enum):
 
 class Battery:
     RECHARGE_TIME = 3600
-    MAX_CYCLES = 3
 
     def __init__(self, power_supply: str):
         self._max_residual_time: int = residual_time_max[power_supply]

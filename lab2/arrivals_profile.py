@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.interpolate import interp1d
+from scipy.interpolate import PchipInterpolator  # Per spline monotona
 import matplotlib.pyplot as plt
 
 use_custom_profile = True
@@ -7,25 +7,36 @@ use_custom_profile = True
 # Definition of interpolation nodes
 t_nodes = np.array([0, 5, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 23, 24])
 A_nodes = np.array([1, 1, 2, 3, 5, 5, 3, 2, 3, 5, 5, 2, 1, 1]) / 5
-# A_nodes = np.array([3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]) / 5
 
-# Creation of linear interpolation function
-linear_interp = interp1d(t_nodes, A_nodes, kind='linear')
+# Monotonic spline interpolation (PCHIP)
+pchip_interp = PchipInterpolator(t_nodes, A_nodes)
 
-# Interpolation on all the hours in a day
-t = np.linspace(0, 24, 25)
-if use_custom_profile:
-    arrivals_profile = linear_interp(t)
-else:
-    arrivals_profile = np.ones(shape=(25,))
+# Interpolation on a finer time scale
+t_fine = np.linspace(0, 24, 300)
+arrivals_profile = pchip_interp(t_fine)
 
+# Clipping values to be within [0, 1]
+arrivals_profile = np.clip(arrivals_profile, 0, 1)
+
+# Plot with improved aesthetics
 if __name__ == "__main__":
     plt.figure(figsize=(10, 5))
-    plt.plot(t_nodes, A_nodes, 'o', label='Interpolation nodes')
-    plt.plot(t, arrivals_profile, '-', label='Complete profile')
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title('Arrival rates profile')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    plt.plot(t_fine, arrivals_profile, '-', label='Monotonic spline fit', color='orange', linewidth=2)
+    plt.plot(t_nodes, A_nodes, 'o', label='Interpolation nodes', color='blue', markersize=8)
+    plt.xlabel('Time (hours)', fontsize=12)
+    plt.ylabel('Arrival Rate', fontsize=12)
+    plt.title('Arrival Rates Profile', fontsize=14)
+    plt.legend(fontsize=10)
+    plt.grid(linestyle='--', linewidth=.4)
+
+    # Set yticks to match the unique values in A_nodes
+    unique_A_nodes = np.unique(A_nodes)  # Remove duplicates for clean Y ticks
+    plt.yticks(unique_A_nodes)  # Set Y ticks to A_nodes values
+
+    plt.xticks(np.arange(0, 25, step=1))  # Display every 1 hours
+    plt.tight_layout()  # Better spacing
+
+    # Save the figure
+    output_filename = "./report_images/arrivals_rate_per_hour.png"
+    plt.savefig(output_filename)
+    plt.close()

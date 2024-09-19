@@ -1,10 +1,11 @@
+import json
 import random
 from queue import PriorityQueue
-import lab2
 import results_visualization
-from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, clear_folder, overall_metrics)
+import lab2
+from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, clear_folder, overall_metrics,
+                  working_time_by_schedule_and_recharges)
 from utils.queues import MMmB
-import json
 
 # Clear the folder where report images will be stored to ensure fresh output.
 clear_folder('./report_images')
@@ -21,7 +22,7 @@ results_dict = {}
 
 
 # Function to run the simulation for a given WORKING_SCHEDULING configuration
-def run_simulation(scheduling_key, recharging):
+def run_simulation(scheduling_key, recharging_key):
     # Initialize different drone types based on the configuration 'I'
     drone = variables["drone_types"]['A']  # Get drone specifications from configuration
 
@@ -31,17 +32,18 @@ def run_simulation(scheduling_key, recharging):
         power_supply=drone['POW'],  # Power supply of the drone
         service_times=[1 / (variables['BASE_SERVICE_RATE'] * drone['SERVICE_RATE'])],
         buffer_size=variables['BASE_BUFFER_SIZE'] * drone['BUFFER_SIZE'],  # Buffer size is multiplied by drone's factor
-        maximum_recharge_cycles=variables["RECHARGE_CONSTRAINT"][recharging],  # Max number of recharge cycles for the drone
+        maximum_recharge_cycles=variables["RECHARGE_CONSTRAINT"][recharging_key],
+        # Max number of recharge cycles for the drone
         working_slots=variables["WORKING_SCHEDULING"][scheduling_key]  # Time intervals when the drone is operational
     )
 
     # Simulation logic (same as before)
     random.seed(42)
-    time = 0
+    time = variables['STARTING_TIME']
     FES = PriorityQueue()
-    FES.put((0, Event.ARRIVAL, None, None))
+    FES.put((time, Event.ARRIVAL, None, None))
 
-    while time < variables['SIM_TIME']:
+    while time < variables['STARTING_TIME'] + variables['SIM_TIME']:
         (time, event_type, drone_id, arg) = FES.get()
 
         if event_type == Event.ARRIVAL:
@@ -54,24 +56,28 @@ def run_simulation(scheduling_key, recharging):
             evt_recharge(time, drone_id)
 
     # Calculate total working time for the current WORKING_SCHEDULING
-    working_time = sum(slot[1] - slot[0] for slot in variables['WORKING_SCHEDULING'][scheduling_key])
+    working_time = working_time_by_schedule_and_recharges()
 
     results = overall_metrics(data, working_time)
-    dict_key = str(variables["RECHARGE_CONSTRAINT"][recharging]) + " " + "RECHARGE" + " " + "WORKING SCHEDULE" + " " + scheduling_key
+    dict_key = str(variables["RECHARGE_CONSTRAINT"][
+                       recharging_key]) + " " + "RECHARGE" + " " + "WORKING SCHEDULE" + " " + scheduling_key
     results_dict[dict_key] = results
-
-    return measurements, data
+    results_visualization.plot_drones(measurements)
+    return
 
 
 # Run the simulation for each WORKING_SCHEDULING and RECHARGE_CONSTRAINT configuration
-for recharging in variables["RECHARGE_CONSTRAINT"]:
+for recharging_key in variables["RECHARGE_CONSTRAINT"]:
     for scheduling_key in variables[f"WORKING_SCHEDULING"]:
+        # Reset metrics at each simulation
+        lab2.init_simulation_environment()
+        measurements = lab2.measurements
+        data = lab2.data
+
         # Run the simulation and get the results
-        measurements, data = run_simulation(scheduling_key, recharging)
+        run_simulation(scheduling_key, recharging_key)
 
 # Salva il dizionario in un file JSON
-output_file_path = "./report_images/result_task_2_2.json"
+output_file_path = "./report_images/result_task_2_c.json"
 with open(output_file_path, 'w') as json_file:
     json.dump(results_dict, json_file, indent=4)
-
-# results_visualization.plot_simulation_data(output_file_path)
