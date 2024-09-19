@@ -39,11 +39,11 @@ def run_simulation(scheduling_key, recharging_key):
 
     # Simulation logic (same as before)
     random.seed(42)
-    time = variables['STARTING_TIME']
+    time = variables['SIM_START']
     FES = PriorityQueue()
     FES.put((time, Event.ARRIVAL, None, None))
 
-    while time < variables['STARTING_TIME'] + variables['SIM_TIME']:
+    while time < variables['SIM_START'] + variables['SIM_TIME']:
         (time, event_type, drone_id, arg) = FES.get()
 
         if event_type == Event.ARRIVAL:

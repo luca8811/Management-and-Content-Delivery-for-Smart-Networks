@@ -65,7 +65,7 @@ def simulation_pipeline(slot_counter, start_working_time):
             evt_recharge(time, drone_id)  # Handle drone recharge event
 
     # Set the start time for visualizations based on the configured start time
-    results_visualization.STARTING_TIME = variables['STARTING_TIME']
+    results_visualization.SIM_START = variables['SIM_START']
 
     # Calculate the warm-up period to remove transient behavior and focus on steady-state behavior
     warmup_period = calculate_warmup_period(

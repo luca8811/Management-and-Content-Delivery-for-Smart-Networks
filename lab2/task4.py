@@ -24,17 +24,17 @@ if __name__ == '__main__':
     random.seed(42)
 
     # the simulation time
-    time = variables['STARTING_TIME']
+    time = variables['SIM_START']
 
     # the list of events in the form: (time, evt_type, drone_id*, additional_parameters*)
     # * -> if needed
     FES = PriorityQueue()
 
     # schedule the first arrival at t=0, in order to make the simulation start.
-    FES.put((variables['STARTING_TIME'], Event.ARRIVAL, None, None))
+    FES.put((variables['SIM_START'], Event.ARRIVAL, None, None))
 
     # simulate until the simulated time reaches a constant
-    while time < variables['STARTING_TIME'] + variables['SIM_TIME']:
+    while time < variables['SIM_START'] + variables['SIM_TIME']:
         (time, event_type, drone_id, arg) = FES.get()
 
         if event_type == Event.ARRIVAL:
@@ -45,7 +45,7 @@ if __name__ == '__main__':
             evt_switch_off(time, FES, drone_id, arg)
         elif event_type == Event.RECHARGE:
             evt_recharge(time, drone_id)
-    results_visualization.STARTING_TIME = variables['STARTING_TIME']
+    results_visualization.SIM_START = variables['SIM_START']
     results_visualization.plot_users(measurements)
     results_visualization.plot_arrivals(measurements)
     results_visualization.plot_departures(measurements)

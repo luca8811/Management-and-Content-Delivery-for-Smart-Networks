@@ -4,7 +4,7 @@ from utils.measurements import Measurements
 import pandas as pd
 import re
 
-STARTING_TIME = 0
+SIM_START = 0
 
 
 def plot_users(measurements: Measurements):
