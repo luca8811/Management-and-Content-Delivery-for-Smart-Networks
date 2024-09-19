@@ -52,12 +52,12 @@ def departure(time, FES, queue: MMmB, server_id, data: Measurement):
         client = queue.consume(server_id)
         client.start_service_time = time
         data.departures += 1
-        data.transmitted_packets += 1
+        # data.transmitted_packets += 1
         data.delay += (time - client.arrival_time)
 
         if client.start_service_time > client.arrival_time:  # Il pacchetto ha aspettato in coda
             data.waiting_delay += client.start_service_time - client.arrival_time
-            data.waiting_delays.append(client.start_service_time - client.arrival_time)
+            # data.waiting_delays.append(client.start_service_time - client.arrival_time)
         data.average_users += users * (time - data.time)
         data.time = time
         users -= 1  # Decrementa il numero di utenti

@@ -1,17 +1,18 @@
+import json
 import random
 from queue import PriorityQueue
-import lab2
+
 import results_visualization
+import lab2
 from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, clear_folder, overall_metrics,
-                  working_time_by_schedule_and_recharges, calculate_working_cycles)
+                  calculate_working_cycles, working_time_by_schedule_and_recharges, sort_by_departure_percentage)
 from utils.queues import MMmB
-import json
 
 # Clear the folder where report images will be stored to ensure fresh output.
 clear_folder('./report_images')
 
 # Initialize variables and configurations for the simulation
-lab2.init_variables("TASK2")
+lab2.init_variables("TASK3")
 variables = lab2.variables
 MMms = lab2.MMms
 measurements = lab2.measurements
@@ -22,13 +23,13 @@ results_dict = {}
 
 
 # Function to run the simulation for a given WORKING_SCHEDULING configuration
-def run_simulation(scheduling_key):
+def run_simulation(configuration, scheduling_key, recharging_key):
 
+    max_recharges = variables["RECHARGE_CONSTRAINT"][recharging_key]
     working_schedule_lists = variables["WORKING_SCHEDULING"][scheduling_key]
-    max_recharges = variables["RECHARGE_CONSTRAINT"]["V"]
 
-    # Initialize different drone types based on the configuration 'I'
-    drone = variables["drone_types"]['A']  # Get drone specifications from configuration
+    drone_type = variables["configurations"][configuration][0]
+    drone = variables["drone_types"][drone_type]  # Get drone specifications from configuration
     power_supply = drone["POW"]
 
     working_time = working_time_by_schedule_and_recharges(max_recharges, working_schedule_lists, power_supply)
@@ -40,18 +41,18 @@ def run_simulation(scheduling_key):
         power_supply=power_supply,  # Power supply of the drone
         service_times=[1 / (variables['BASE_SERVICE_RATE'] * drone['SERVICE_RATE'])],
         buffer_size=variables['BASE_BUFFER_SIZE'] * drone['BUFFER_SIZE'],  # Buffer size is multiplied by drone's factor
-        maximum_recharge_cycles=max_recharges,  # Max number of recharge cycles for the drone
+        maximum_recharge_cycles=max_recharges,
+        # Max number of recharge cycles for the drone
         working_slots=working_schedule_lists  # Time intervals when the drone is operational
     )
 
     # Simulation logic (same as before)
     random.seed(42)
-
-    time = 0
+    time = variables['SIM_START']
     FES = PriorityQueue()
-    FES.put((0, Event.ARRIVAL, None, None))
+    FES.put((time, Event.ARRIVAL, None, None))
 
-    while time < variables['SIM_TIME']:
+    while time < variables['SIM_START'] + variables['SIM_TIME']:
         (time, event_type, drone_id, arg) = FES.get()
 
         if event_type == Event.ARRIVAL:
@@ -63,20 +64,22 @@ def run_simulation(scheduling_key):
         elif event_type == Event.RECHARGE:
             evt_recharge(time, drone_id)
 
-    results_dict["WORKING SCHEDULE" + " " + scheduling_key] = overall_metrics(data, working_time, working_cycles)
+    results_dict[power_supply + " " + scheduling_key + " " + str(max_recharges)] = overall_metrics(data, working_time, working_cycles)
 
-    return measurements, data
+# Run the simulation for each WORKING_SCHEDULING and RECHARGE_CONSTRAINT configuration
+for configuration in variables["configurations"]:
+    for scheduling_key in variables[f"WORKING_SCHEDULING"]:
+        for recharging_key in variables["RECHARGE_CONSTRAINT"]:
 
+            # Reset metrics at each simulation
+            lab2.init_simulation_environment()
+            measurements = lab2.measurements
+            data = lab2.data
 
-# Run the simulation for each WORKING_SCHEDULING configuration
-for scheduling_key in variables[f"WORKING_SCHEDULING"]:
-
-    # Run the simulation and get the results
-    measurements, data = run_simulation(scheduling_key)
+            # Run the simulation and get the results
+            run_simulation(configuration, scheduling_key, recharging_key)
 
 # Salva il dizionario in un file JSON
-output_file_path = "./report_images/result_of_the_simulations_for_comparison.json"
+output_file_path = "./report_images/result_task_3_plus.json"
 with open(output_file_path, 'w') as json_file:
     json.dump(results_dict, json_file, indent=4)
-
-results_visualization.plot_simulation_data(output_file_path)

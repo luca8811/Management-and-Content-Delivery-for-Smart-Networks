@@ -19,20 +19,21 @@ class Measurement:
         self.average_users = 0  # Changed from 'ut'
         self.delay = 0
         self.total_users = 0
-        self.working_interval = 25*60  # 25 minutes of work before recharging
+        self.working_interval = 25 * 60  # 25 minutes of work before recharging
+        self.charging_cycles = 0  # Number of complete discharge/charge cycles
 
         # TODO: da controllare - non tutti sono utilizzati
         self.average_delay = 0
         self.average_losses = 0
-        self.transmitted_packets = 0  # Number of transmitted packets
-        self.average_packets = 0  # Sum of packets in the system for calculating average
+        # self.transmitted_packets = 0  # Number of transmitted packets
+        # self.average_packets = 0  # Sum of packets in the system for calculating average
         self.queue_delay = 0  # Total queue delay
         self.waiting_delay = 0  # Total waiting delay
         self.buffer_occupancy = 0  # Average buffer occupancy
         self.loss_probability = 0  # Loss probability
         self.busy_time = 0  # Total busy time of the server
-        self.queue_delays = []  # List of individual queue delays for distribution
-        self.waiting_delays = []  # List of individual waiting delays for distribution
+        # self.queue_delays = []  # List of individual queue delays for distribution
+        # self.waiting_delays = []  # List of individual waiting delays for distribution
 
 
 class Measurements:
@@ -178,5 +179,3 @@ class FilteredMeasurements(Measurement, Measurements):
         # plt.savefig(output_filename)
         # plt.close()
         plt.show()
-
-

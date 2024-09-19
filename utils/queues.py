@@ -72,7 +72,6 @@ class MMmB:
         self._scheduling_policy = self._get_server_fastest
         self.users = 0
 
-
     def battery_recharge(self):
         self.battery.status = BatteryStatus.FULL
         self.battery.complete_cycles += 1
@@ -177,5 +176,6 @@ class MMmB:
         is greater than or equal to the maximum limit of charging cycles.
         """
         if not self.maximum_recharge_cycles == "inf":
+            assert isinstance(self.maximum_recharge_cycles, int)
             return self.battery.complete_cycles >= self.maximum_recharge_cycles
         return False

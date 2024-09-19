@@ -149,6 +149,7 @@ def evt_recharge(time, drone_id):
     drone = MMms[drone_id]
     drone.battery_recharge()
     data.charging_drones -= 1
+    data.charging_cycles += 1
     measurements.add_measurement(measurement=data)
 
 
@@ -420,7 +421,7 @@ def seconds_to_time_string(seconds):
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
-def overall_metrics(data, working_time):
+def overall_metrics(data, working_time, working_cycles):
     """
     Compare overall and steady-state metrics in a dictionary format.
 
@@ -440,6 +441,7 @@ def overall_metrics(data, working_time):
     # Prepare the steady-state metrics in dictionary format
     overall_metrics = {
         'Working Time': round_if_number(working_time),
+        'Working Cycles': working_cycles,
         'Total Arrivals': round_if_number(data.arrivals),
         'Total Departures': round_if_number(data.departures),
         'Total Losses': round_if_number(data.losses),
@@ -461,33 +463,79 @@ def overall_metrics(data, working_time):
     return overall_metrics
 
 
-def calculate_working_cycles(working_schedule_list):
+def define_working_and_charging_interval(power_supply):
+
+    if power_supply == "BAT":
+        working_interval = 25 * 60  # seconds
+        charging_interval = 60 * 60  # seconds
+
+    elif power_supply == "W45":
+        working_interval = 35 * 60  # seconds
+        charging_interval = 60 * 60  # seconds
+
+    elif power_supply == "W65":
+        working_interval = 40 * 60  # seconds
+        charging_interval = 60 * 60  # seconds
+
+    elif power_supply == "W75":
+        working_interval = 45 * 60  # seconds
+        charging_interval = 60 * 60  # seconds
+
+    return working_interval, charging_interval
+
+
+def calculate_working_cycles_per_interval(working_schedule_list, power_supply):
+
     working_period = working_schedule_list[1] - working_schedule_list[0]
-    working_interval = 25 * 60  # seconds
-    charging_interval = 60 * 60  # seconds
-    working_cycle = working_interval + charging_interval  # = 5100
+    working_interval, charging_interval = define_working_and_charging_interval(power_supply)
+
+    working_cycle = working_interval + charging_interval
     working_slots = int(working_period / working_cycle)
+
     res = working_period - working_cycle * working_slots
+
     if res > 0:
         if int(res / working_interval) > 0:
             working_slots += 1
+
     return working_slots
 
 
-def working_time_by_schedule_and_recharges(max_recharges, working_schedule_lists):
+def calculate_working_cycles(max_recharges, pow_supply, working_schedule_lists):
+
     working_slots = 0
     for slot in working_schedule_lists:
-        unbounded_working_slots = calculate_working_cycles(slot)
-        working_slots += unbounded_working_slots
+        working_slots += calculate_working_cycles_per_interval(slot, pow_supply)
 
     if isinstance(max_recharges, int):
         if working_slots > max_recharges:
-            working_time = max_recharges * 1500
-        else:
-            working_time = working_slots * 1500
-    elif max_recharges == "inf":
-        working_time = working_slots * 1500
-    else:
-        raise ValueError("max_recharges must be int or 'inf'")
+            working_slots = max_recharges
 
-    return working_time
+    return working_slots
+
+
+def working_time_by_schedule_and_recharges(max_recharges, working_schedule_lists, pow_supply):
+    working_slots = calculate_working_cycles(max_recharges, pow_supply,working_schedule_lists)
+    working_interval, _ = define_working_and_charging_interval(pow_supply)
+    return working_slots*working_interval
+
+
+def sort_and_filter_by_departure_percentage(result_dict):
+    """
+    Takes a dictionary with simulation results and returns a new dictionary
+    sorted by Departure Percentage in descending order, keeping only the Departure Percentage.
+
+    :param result_dict: Dictionary containing simulation results.
+    :return: A new dictionary sorted by Departure Percentage in descending order, with only the Departure Percentage as values.
+    """
+    # Create a sorted list of tuples (key, departure_percentage) based on "Departures Percentage" value
+    sorted_tuples = sorted(
+        result_dict.items(),
+        key=lambda item: item[1]["Departures Percentage"],
+        reverse=True
+    )
+
+    # Create a new dictionary that keeps only the "Departures Percentage" value
+    sorted_filtered_dict = {key: value["Departures Percentage"] for key, value in sorted_tuples}
+
+    return sorted_filtered_dict
