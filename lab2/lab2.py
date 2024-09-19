@@ -48,6 +48,7 @@ def is_drone_available(time, drone: MMms):
             and drone.battery.status == BatteryStatus.IN_USE
             and not drone.is_queue_full())
 
+
 def is_drone_ready(time, drone: MMms):
     return (drone.battery.status in [BatteryStatus.PAUSED, BatteryStatus.FULL]
             and drone.is_in_working_slot(time)
@@ -458,3 +459,32 @@ def overall_metrics(data, working_time):
     }
 
     return overall_metrics
+
+
+def calculate_working_cycles(working_schedule_list):
+    working_period = working_schedule_list[1] - working_schedule_list[0]
+    working_interval = 25 * 60  # seconds
+    charging_interval = 60 * 60  # seconds
+    working_cycle = working_interval + charging_interval  # = 5100
+    working_slots = int(working_period / working_cycle)
+    res = working_period - working_cycle * working_slots
+    if res > 0:
+        if int(res / working_interval) > 0:
+            working_slots += 1
+    return working_slots
+
+
+def working_time_by_schedule_and_recharges(max_recharges: int = 5,
+                                                             working_schedule_lists: list = [[0, 5000]]):
+
+    working_slots = 0
+    for slot in working_schedule_lists:
+        unbounded_working_slots = calculate_working_cycles(slot)
+        working_slots += unbounded_working_slots
+
+    if working_slots > max_recharges:
+        working_time = max_recharges * 3600
+    else:
+        working_time = working_slots * 3600
+
+    return working_time
