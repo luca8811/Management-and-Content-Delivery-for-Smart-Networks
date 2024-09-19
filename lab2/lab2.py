@@ -475,17 +475,20 @@ def calculate_working_cycles(working_schedule_list):
     return working_slots
 
 
-def working_time_by_schedule_and_recharges(max_recharges: int = 5,
-                                                             working_schedule_lists: list = [[0, 5000]]):
-
+def working_time_by_schedule_and_recharges(max_recharges, working_schedule_lists):
     working_slots = 0
     for slot in working_schedule_lists:
         unbounded_working_slots = calculate_working_cycles(slot)
         working_slots += unbounded_working_slots
 
-    if working_slots > max_recharges:
-        working_time = max_recharges * 3600
+    if isinstance(max_recharges, int):
+        if working_slots > max_recharges:
+            working_time = max_recharges * 1500
+        else:
+            working_time = working_slots * 1500
+    elif max_recharges == "inf":
+        working_time = working_slots * 1500
     else:
-        working_time = working_slots * 3600
+        raise ValueError("max_recharges must be int or 'inf'")
 
     return working_time
