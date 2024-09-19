@@ -135,10 +135,6 @@ def plot_server_loads(servers, title="Server Load Distribution", filename="serve
 
     plt.title(title, fontsize=16)
     plt.tight_layout()
-
-    # Salva l'immagine come file PNG
-    plt.savefig(filename, format='png')  # Salva l'immagine con il nome fornito
-
     plt.show()
 
 

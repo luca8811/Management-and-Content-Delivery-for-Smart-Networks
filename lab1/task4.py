@@ -1,172 +1,170 @@
 import random
 from queue import PriorityQueue
+import math
+import matplotlib.pyplot as plt
 from utils.queues import MMmB, Packet
 from utils.measurements import Measurement
-import matplotlib.pyplot as plt
 
-# Constants
-BUFFER_SIZE = 100
-SERVICE = 10.0
-ARRIVAL = 10
-N_ANTENNAS = 1  # m = 1
-N_DRONES = 1  # N = 1
-SIM_TIME = 500000
-users = 0
+# Simulation Parameters
+SERVICE = 1.0  # Average service time (reasonable time units)
+BUFFER_SIZE = 10  # Buffer size (number of packets)
+SERVICE_TIMES = [SERVICE]
+SIM_TIME = 50000  # Total simulation time (reduced for faster execution)
+ARRIVAL_RATE = 0.9  # Single arrival rate to test
 
-# Different service time distributions to test
-distributions = {
-    'exponential': lambda: random.expovariate(1.0 / SERVICE),
-    'uniform': lambda: random.uniform(SERVICE / 2, SERVICE * 1.5),
-    'normal': lambda: max(0.0, random.gauss(SERVICE, SERVICE * 0.25))  # Avoid negative service times
-}
 
-def run_simulation(service_time_dist):
-    MMms = {i: MMmB(power_supply="INF", service_times=[SERVICE], buffer_size=BUFFER_SIZE) for i in range(N_DRONES)}
+# Function to generate service time based on the chosen distribution
+def generate_service_time(distribution="exponential", service_mean=SERVICE):
+    if distribution == "exponential":
+        return random.expovariate(1.0 / service_mean)  # Exponential distribution
+    elif distribution == "uniform":
+        return random.uniform(service_mean * 0.5, service_mean * 1.5)  # Uniform distribution
+    elif distribution == "normal":
+        return max(0.0, random.gauss(service_mean, service_mean * 0.2))  # Normal (Gaussian) distribution
+    elif distribution == "gamma":
+        shape = 2.0  # Shape parameter (k)
+        scale = service_mean / shape  # Mean = shape * scale
+        return random.gammavariate(shape, scale)  # Gamma distribution
+    else:
+        raise ValueError(f"Distribution '{distribution}' is not supported.")
 
-    def resolve_MMm():
-        return random.choice(list(MMms.keys()))
 
-    for queue in MMms.values():
-        queue._scheduling_policy = queue._get_server_fastest
-
-    FES = PriorityQueue()
-    FES.put((0, "arrival", resolve_MMm(), None))
-    time = 0
-    data = Measurement()
-
-    while time < SIM_TIME:
-        (time, event_type, queue_id, server_id) = FES.get()
-        if event_type == "arrival":
-            arrival(time, FES, queue_id, data, MMms, resolve_MMm, service_time_dist)
-        elif event_type == "departure":
-            departure(time, FES, queue_id, server_id, data, MMms, resolve_MMm, service_time_dist)
-
-    # Final calculations
-    if data.time > 0:  # Avoid division by zero
-        data.average_users /= data.time
-        data.buffer_occupancy /= data.time
-        data.busy_time /= data.time
-
-    return data
-
-def arrival(time, FES, queue_id, data, MMms, resolve_MMm, service_time_dist):
+# Function to handle arrival events
+def arrival(time, FES, queue: MMmB, arrival_rate, data: Measurement, distribution="exponential"):
     global users
-    queue = MMms[queue_id]
-    loss = queue.is_queue_full()
+    loss = False
     data.arrivals += 1
-    data.average_users += users * (time - data.time)
+    data.average_users += users * (time - data.time)  # Weighted time
     data.time = time
+    try:
+        if queue.buffer_size > 0:
+            queue.insert(Packet(time))
+            users += 1
+        else:
+            # Attempt to process the packet directly if buffer is 0
+            if queue.can_engage_server():
+                queue.insert(Packet(time))
+                users += 1
+            else:
+                loss = True
+    except OverflowError:
+        loss = True
 
     if loss:
         data.losses += 1
+        data.loss_probability = data.losses / data.arrivals
     else:
-        users += 1
-        packet = Packet(time)
-        queue.insert(packet)
-        data.buffer_occupancy += queue.queue_size() * (time - data.time)
-
         if queue.can_engage_server():
-            server_id = queue._scheduling_policy()
-            server = queue._servers[server_id]
-            service_duration = service_time_dist()
-            packet.start_service_time = time
-            queue.engage_server()
-            server.engage(service_duration)
-            FES.put((time + service_duration, "departure", queue_id, server_id))
+            s_id, _ = queue.engage_server()
+            service_time = generate_service_time(distribution)  # Generate service time with chosen distribution
+            FES.put((time + service_time, "departure", s_id))  # Departure event
 
-    # Schedule next arrival
-    inter_arrival = random.expovariate(1.0 / ARRIVAL)
-    FES.put((time + inter_arrival, "arrival", resolve_MMm(), None))
+    inter_arrival = random.expovariate(arrival_rate)
+    FES.put((time + inter_arrival, "arrival", None))
 
-def departure(time, FES, queue_id, server_id, data, MMms, resolve_MMm, service_time_dist):
+
+# Function to handle departure events
+def departure(time, FES, queue: MMmB, server_id, data: Measurement, distribution="exponential"):
     global users
-    queue = MMms[queue_id]
-    packet = queue.consume(server_id)
-    data.departures += 1
-    data.average_users += users * (time - data.time)
-    data.time = time
-    if packet and packet.start_service_time is not None:
-        service_duration = time - packet.start_service_time
-        data.delay += (time - packet.arrival_time)
-        data.queue_delay += (packet.start_service_time - packet.arrival_time)
-        data.waiting_delay += service_duration
-        data.busy_time += service_duration
-    users -= 1
+    if queue.queue_size() > 0:
+        client = queue.consume(server_id)
+        client.start_service_time = time
+        data.departures += 1
+        data.transmitted_packets += 1
+        data.delay += (time - client.arrival_time)
 
-    queue._servers[server_id].release()
+        if client.start_service_time > client.arrival_time:  # Packet waited in queue
+            data.waiting_delay += client.start_service_time - client.arrival_time
+            data.waiting_delays.append(client.start_service_time - client.arrival_time)
+        data.average_users += users * (time - data.time)
+        data.time = time
+        users -= 1  # Decrement the number of users
+        if queue.can_engage_server():
+            s_id, _ = queue.engage_server()
+            service_time = generate_service_time(distribution)  # Generate service time with chosen distribution
+            FES.put((time + service_time, "departure", s_id))
+            data.busy_time += service_time
 
-    if queue.can_engage_server():
-        server_id = queue._scheduling_policy()
-        server = queue._servers[server_id]
-        service_duration = service_time_dist()
-        next_packet = queue.get_last()
-        next_packet.start_service_time = time
-        queue.engage_server()
-        FES.put((time + service_duration, "departure", queue_id, server_id))
+        # Calculate buffer occupancy
+        if BUFFER_SIZE > 0:
+            data.buffer_occupancy = users / BUFFER_SIZE
+        else:
+            data.buffer_occupancy = 0  # If buffer is 0, occupancy is 0
+    else:
+        queue._servers[server_id].release()  # Release the server if there are no packets in queue
 
-def plot_results(data, title):
-    print(f"Results for {title} Distribution:")
-    print(f"  Number of arrivals: {data.arrivals}")
-    print(f"  Number of departures: {data.departures}")
-    print(f"  Number of losses: {data.losses}")
-    print(f"  Average users in system: {data.average_users}")
-    print(f"  Average delay: {data.delay / data.departures if data.departures > 0 else 0}")
-    print(f"  Average queue delay: {data.queue_delay / data.departures if data.departures > 0 else 0}")
-    print(f"  Average waiting delay: {data.waiting_delay / data.departures if data.departures > 0 else 0}")
-    print(f"  Loss probability: {data.losses / data.arrivals if data.arrivals > 0 else 0}")
-    print(f"  Average buffer occupancy: {data.buffer_occupancy / data.time if data.time > 0 else 0}")
-    print(f"  Busy time ratio: {data.busy_time}")
 
-def plot_comparisons(results):
-    # Estrarre i risultati per ogni distribuzione
-    labels = list(results.keys())
-    avg_delay = [results[dist]['avg_delay'] for dist in labels]
-    loss_prob = [results[dist]['loss_prob'] for dist in labels]
-    buffer_occupancy = [results[dist]['avg_buffer_occupancy'] for dist in labels]
+if __name__ == '__main__':
+    service_distributions = ["exponential", "uniform", "normal", "gamma"]  # Different service distributions to test
+    ARRIVAL = ARRIVAL_RATE
 
-    x = range(len(labels))
+    # Lists to store the results for each distribution
+    avg_users = []
+    avg_delay = []
+    loss_probability = []
+    busy_time_ratio = []
 
-    # Grafico per ritardo medio
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    plt.bar(x, avg_delay, color='blue', alpha=0.6)
-    plt.xticks(x, labels)
-    plt.title('Average Delay by Distribution')
-    plt.xlabel('Service Time Distribution')
-    plt.ylabel('Average Delay')
+    for service_distribution in service_distributions:
+        random.seed(42)
+        data = Measurement()
+        FES = PriorityQueue()
+        FES.put((0, "arrival", None))
+        MMm = MMmB(power_supply="INF", service_times=SERVICE_TIMES, buffer_size=BUFFER_SIZE)
+        users = 0
+        time = 0
+        while not FES.empty() and time < SIM_TIME:
+            time, event_type, server_id = FES.get()
+            if event_type == "arrival":
+                arrival(time, FES, MMm, ARRIVAL, data, distribution=service_distribution)
+            elif event_type == "departure":
+                departure(time, FES, MMm, server_id, data, distribution=service_distribution)
 
-    # Grafico per la probabilità di perdita
-    plt.subplot(1, 2, 2)
-    plt.bar(x, loss_prob, color='red', alpha=0.6)
-    plt.xticks(x, labels)
-    plt.title('Loss Probability by Distribution')
-    plt.xlabel('Service Time Distribution')
-    plt.ylabel('Loss Probability')
+        average_delay = data.delay / data.departures if data.departures > 0 else 0
+        busy_time_ratio_val = data.busy_time / SIM_TIME  # Busy time ratio calculation
 
-    plt.tight_layout()
+        # Store results
+        avg_users.append(data.average_users / time if time > 0 else 0)
+        avg_delay.append(average_delay)
+        loss_probability.append(data.loss_probability if data.arrivals > 0 else 0)
+        busy_time_ratio.append(busy_time_ratio_val)
+
+        # Print the results for each distribution
+        print(f"\nResults for Service Time Distribution = {service_distribution}:")
+        print(f" - Arrival Rate: {ARRIVAL}")
+        print(f" - Users in Queue: {users}")
+        print(f" - Arrivals: {data.arrivals}")
+        print(f" - Departures: {data.departures}")
+        print(f" - Avg Users: {data.average_users / time if time > 0 else 0:.2f}")
+        print(f" - Avg Delay: {average_delay:.2f}")
+        print(f" - Loss Probability: {data.loss_probability if data.arrivals > 0 else 0:.4f}")
+        print(f" - Avg Waiting Delay: {data.waiting_delay / data.departures if data.departures > 0 else 0:.2f}")
+        print(f" - Avg Buffer Occupancy: {data.buffer_occupancy:.2f}")
+        print(f" - Busy Time Ratio: {busy_time_ratio_val:.4f}")
+
+    # Plot Average Users
+    plt.figure()
+    plt.bar(service_distributions, avg_users, color='skyblue')
+    plt.title('Average Users in System')
+    plt.ylabel('Avg Users')
     plt.show()
 
-# Main simulation and analysis
-if __name__ == '__main__':
-    random.seed(42)
-    results = {}
+    # Plot Average Delay
+    plt.figure()
+    plt.bar(service_distributions, avg_delay, color='lightgreen')
+    plt.title('Average Delay in System')
+    plt.ylabel('Avg Delay')
+    plt.show()
 
-    for dist_name, dist_func in distributions.items():
-        print(f"Running simulation with {dist_name} distribution...")
-        data = run_simulation(dist_func)
+    # Plot Loss Probability
+    plt.figure()
+    plt.bar(service_distributions, loss_probability, color='salmon')
+    plt.title('Loss Probability')
+    plt.ylabel('Loss Probability')
+    plt.show()
 
-        # Memorizza i risultati in un dizionario
-        results[dist_name] = {
-            'arrivals': data.arrivals,
-            'departures': data.departures,
-            'losses': data.losses,
-            'avg_delay': data.delay / data.departures if data.departures > 0 else 0,
-            'loss_prob': data.losses / data.arrivals if data.arrivals > 0 else 0,
-            'avg_buffer_occupancy': data.buffer_occupancy / data.time if data.time > 0 else 0
-        }
-
-        # Stampa i risultati per ogni distribuzione
-        plot_results(data, dist_name.capitalize())
-
-    # Visualizza un confronto tra le distribuzioni
-    plot_comparisons(results)
+    # Plot Busy Time Ratio
+    plt.figure()
+    plt.bar(service_distributions, busy_time_ratio, color='darkblue')
+    plt.title('Busy Time Ratio')
+    plt.ylabel('Busy Time Ratio')
+    plt.show()
