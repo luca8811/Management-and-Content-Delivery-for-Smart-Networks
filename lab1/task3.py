@@ -27,8 +27,12 @@ def run_simulation(policy):
         return random.choice(list(MMms.keys()))
 
     for queue in MMms.values():
-        queue._scheduling_policy = queue._get_server_fastest if policy == 'fastest' else \
-            (queue._get_server_roundrobin if policy == 'round_robin' else queue._get_server_random)
+        if policy == 'fastest':
+            queue._scheduling_policy = queue._get_server_fastest
+        elif policy == 'round_robin':
+            queue._scheduling_policy = queue._get_server_roundrobin
+        else:
+            queue._scheduling_policy = queue._get_server_random
 
     FES = PriorityQueue()
     FES.put((0, "arrival", resolve_MMm(), None))
@@ -73,7 +77,6 @@ def arrival(time, FES, queue_id, data, MMms, resolve_MMm):
         next_packet = queue.get_last()  # Verifica se `get_last()` è il metodo giusto per ottenere il pacchetto
         next_packet.start_service_time = time  # Inizia il tempo di servizio per il pacchetto
 
-        queue.engage_server()  # Segnala che il server è impegnato
         server.engage(service_duration)
         FES.put((time + service_duration, "departure", queue_id, server_id))
 
@@ -135,10 +138,6 @@ def plot_server_loads(servers, title="Server Load Distribution", filename="serve
 
     plt.title(title, fontsize=16)
     plt.tight_layout()
-
-    # Salva l'immagine come file PNG
-    plt.savefig(filename, format='png')  # Salva l'immagine con il nome fornito
-
     plt.show()
 
 

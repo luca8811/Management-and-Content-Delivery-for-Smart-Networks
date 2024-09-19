@@ -60,7 +60,8 @@ class Battery:
 
 
 class MMmB:
-    def __init__(self, power_supply: str, service_times: list[float], buffer_size=0, maximum_recharge_cycles="inf", working_slots=[[0, 50000]]):
+    def __init__(self, power_supply: str, service_times: list[float], buffer_size=0, infinite_buffer=False, maximum_recharge_cycles="inf", working_slots=[[0, 50000]]):
+        self.infinite_buffer = infinite_buffer
         self.buffer_size = buffer_size  # B
         self.battery: Battery = Battery(power_supply)
         self.maximum_recharge_cycles = maximum_recharge_cycles
@@ -93,7 +94,7 @@ class MMmB:
         """
         Insert a packet into the queue. If the buffer size is 0, the packet is discarded.
         """
-        if self.buffer_size == 0:
+        if self.buffer_size == 0 and not self.infinite_buffer:
             # Buffer is 0, so the packet should be discarded unless a server is free immediately.
             if self.can_engage_server():
                 self._queue.append(packet)
@@ -110,10 +111,7 @@ class MMmB:
         return len(self._queue)
 
     def is_queue_full(self):
-        """
-        Check if the queue is full. Buffer size = 0 => infinite dimension buffer.
-        """
-        return len(self._queue) == self.buffer_size and self.buffer_size > 0
+        return len(self._queue) == self.buffer_size and not self.infinite_buffer
 
     def _get_servers_working(self):
         return [server.idle for server in self._servers.values()].count(False)
@@ -127,9 +125,10 @@ class MMmB:
         """
         n_servers_w = self._get_servers_working()
         # If buffer_size is 0, we check if there's an immediate slot for processing.
-        if self.buffer_size == 0:
-            return n_servers_w < len(self._servers)
-        return n_servers_w < len(self._servers) and n_servers_w < self.queue_size()
+        return self._get_servers_working() < min(len(self._servers), self.queue_size())
+        # if self.buffer_size == 0:
+        #     return n_servers_w < len(self._servers)
+        # return n_servers_w < len(self._servers) and n_servers_w < self.queue_size()
 
     def _get_server_random(self):
         return random.choice(self._get_available_servers())
@@ -149,7 +148,7 @@ class MMmB:
         return sum(map(lambda server: server.service_time, self._servers.values()))
 
     def engage_server(self):
-        assert self._get_servers_working() < len(self._servers)
+        assert self.can_engage_server()
         server_id = self._scheduling_policy()
         self._servers[server_id].idle = False
         return server_id, self._servers[server_id].service_time

@@ -3,7 +3,8 @@ from queue import PriorityQueue
 import lab2
 import results_visualization
 from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, calculate_warmup_period, clear_folder,
-                  start_working_intervals, seconds_to_time_string, FilteredMeasurements)
+                  start_working_intervals, seconds_to_time_string)
+from utils.measurements import FilteredMeasurements
 from utils.queues import MMmB
 import json
 
@@ -16,7 +17,7 @@ variables = lab2.variables  # All configurations and settings are now stored in 
 MMms = lab2.MMms  # List of MMmB objects representing different drone types
 measurements = lab2.measurements  # To store measurement data (arrivals, departures, losses, etc.)
 data = lab2.data  # Overall data to store aggregated measurements over the simulation time
-starting_times = start_working_intervals(variables["SIM_TIME"], variables["WORKING_SCHEDULING"]["IV"])
+SIM_STARTs = start_working_intervals(variables["SIM_TIME"], variables["WORKING_SCHEDULING"]["IV"])
 
 # Initialize different drone types based on the configuration 'I'
 drone_types = variables['drone_types']
@@ -34,7 +35,7 @@ for i, drone_type in enumerate(variables['configurations']['I']):
 # Main simulation logic
 if __name__ == '__main__':
 
-    initial_time = starting_times[0]
+    initial_time = SIM_STARTs[0]
 
     random.seed(42)  # Set a seed for reproducibility of random events in the simulation
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
             evt_recharge(time, drone_id)  # Handle drone recharge event
 
     # Set the start time for visualizations based on the configured start time
-    results_visualization.STARTING_TIME = variables['STARTING_TIME']
+    results_visualization.SIM_START = variables['SIM_START']
 
     # Calculate the warm-up period to remove transient behavior and focus on steady-state behavior
     warmup_period = calculate_warmup_period(

@@ -98,7 +98,6 @@ if __name__ == '__main__':
         average_delay = data.delay / data.departures if data.departures > 0 else 0
         results.append({
             'Arrival Rate': ARRIVAL,
-            'Users in Queue': users,
             'Arrivals': data.arrivals,
             'Departures': data.departures,
             'Avg Users': data.average_users / time if time > 0 else 0,
