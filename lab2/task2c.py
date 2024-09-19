@@ -1,6 +1,8 @@
 import json
 import random
 from queue import PriorityQueue
+import matplotlib.pyplot as plt
+
 import results_visualization
 import lab2
 from lab2 import (Event, evt_arrival, evt_departure, evt_recharge, evt_switch_off, clear_folder, overall_metrics,
@@ -55,20 +57,20 @@ def run_simulation(scheduling_key, recharging_key):
         elif event_type == Event.RECHARGE:
             evt_recharge(time, drone_id)
 
-    # Calculate total working time for the current WORKING_SCHEDULING
-    working_time = working_time_by_schedule_and_recharges()
+    max_recharges = variables["RECHARGE_CONSTRAINT"][recharging_key]
+    working_schedule_lists = variables["WORKING_SCHEDULING"][scheduling_key]
+
+    # Calculate total working time for the current WORKING_SCHEDULING and MAX RECHARGES
+    working_time = working_time_by_schedule_and_recharges(max_recharges, working_schedule_lists)
 
     results = overall_metrics(data, working_time)
-    dict_key = str(variables["RECHARGE_CONSTRAINT"][
-                       recharging_key]) + " " + "RECHARGE" + " " + "WORKING SCHEDULE" + " " + scheduling_key
+    dict_key = scheduling_key + " " + str(max_recharges)
     results_dict[dict_key] = results
-    results_visualization.plot_drones(measurements)
-    return
-
 
 # Run the simulation for each WORKING_SCHEDULING and RECHARGE_CONSTRAINT configuration
-for recharging_key in variables["RECHARGE_CONSTRAINT"]:
-    for scheduling_key in variables[f"WORKING_SCHEDULING"]:
+for scheduling_key in variables[f"WORKING_SCHEDULING"]:
+    for recharging_key in variables["RECHARGE_CONSTRAINT"]:
+
         # Reset metrics at each simulation
         lab2.init_simulation_environment()
         measurements = lab2.measurements
@@ -81,3 +83,6 @@ for recharging_key in variables["RECHARGE_CONSTRAINT"]:
 output_file_path = "./report_images/result_task_2_c.json"
 with open(output_file_path, 'w') as json_file:
     json.dump(results_dict, json_file, indent=4)
+
+results_visualization.plot_metric(results_dict, metric="Departures Percentage")
+results_visualization.plot_metric(results_dict, metric="Departure Rate")

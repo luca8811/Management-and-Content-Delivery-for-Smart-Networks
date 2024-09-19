@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import json
 from utils.measurements import Measurements
 import pandas as pd
+import numpy as np
 import re
 
 STARTING_TIME = 0
@@ -336,3 +337,69 @@ def plot_simulation_data(file_path):
     output_filename = f"./report_images/plot_result_simulation.png"
     plt.savefig(output_filename, bbox_inches='tight')
     plt.close()
+
+
+def plot_metric(result_dict, metric="Departures Percentage"):
+    """
+    Plots the specified metric (Departure Percentage or Departure Rate) for different Working Schedules and recharge cycles.
+
+    :param result_dict: Dictionary with the simulation results
+    :param metric: The metric to plot, can be either "Departures Percentage" or "Departure Rate"
+    """
+    # Define working schedules and recharge cycles
+    working_schedules = ['I', 'II', 'III']
+    recharges = ['1', '2', '3', '4', 'inf']
+
+    # Set up the figure and subplots
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    # Find the maximum value of the specified metric across all working schedules and recharges
+    max_metric_value = 0
+    for schedule in working_schedules:
+        for recharge in recharges:
+            key = f"{schedule} {recharge}"
+            if key in result_dict:
+                max_metric_value = max(max_metric_value, result_dict[key][metric])
+
+    # Add a margin to the max value to leave space above the bars
+    max_y_lim = max_metric_value + 5
+
+    # For each working schedule, create a barplot
+    for i, schedule in enumerate(working_schedules):
+        metric_values = []
+
+        # Extract metric values for each recharge for the current working schedule
+        for recharge in recharges:
+            key = f"{schedule} {recharge}"
+            if key in result_dict:
+                metric_values.append(result_dict[key][metric])
+            else:
+                metric_values.append(0)  # If data is missing, use 0
+
+        # Create the barplot for the current working schedule
+        axes[i].bar(recharges, metric_values, color='skyblue')
+        axes[i].set_title(f"Working Schedule {schedule}", fontsize=14)
+        axes[i].set_xlabel("Recharges", fontsize=12)
+
+        # Set yticks to match the unique metric values for each subplot
+        unique_yticks = np.unique(metric_values)
+        axes[i].set_yticks(unique_yticks)
+
+        # Set the same Y limit for all subplots
+        axes[i].set_ylim(0, max_y_lim)
+
+    # Set a common Y axis label depending on the metric being plotted
+    if metric == "Departures Percentage":
+        axes[0].set_ylabel("Departure Percentage (%)", fontsize=12)
+    elif metric == "Departure Rate":
+        axes[0].set_ylabel("Departure Rate (departures/second)", fontsize=12)
+
+    # Compact layout
+    plt.tight_layout()
+
+    # Save the plot as an image
+    plt.savefig(f"./report_images/{metric.replace(' ', '_').lower()}_plot.png")
+    plt.close()
+
+
+
